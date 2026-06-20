@@ -1,9 +1,10 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { authApi } from '../../services/api.js'
+import { useAuth } from '../../context/AuthContext.jsx'
 
 function Login() {
   const navigate = useNavigate()
+  const { login } = useAuth()
   const [form, setForm] = useState({ username: '', password: '' })
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
@@ -18,9 +19,7 @@ function Login() {
     setLoading(true)
 
     try {
-      const data = await authApi.login(form.username, form.password)
-      localStorage.setItem('token', data.token)
-      localStorage.setItem('user', JSON.stringify(data.user))
+      await login(form.username, form.password)
       navigate('/dashboard')
     } catch (err) {
       setError(err.message || 'Login failed')
