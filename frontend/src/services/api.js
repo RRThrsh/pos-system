@@ -25,3 +25,17 @@ export const authApi = {
     }),
   me: () => request('/auth/me'),
 }
+
+export const usersApi = {
+  getAll: () => request('/users'),
+  create: (payload) => request('/users', { method: 'POST', body: JSON.stringify(payload) }),
+  update: (id, payload) => request(`/users/${id}`, { method: 'PUT', body: JSON.stringify(payload) }),
+  remove: (id) => request(`/users/${id}`, { method: 'DELETE' }),
+}
+
+export const reportsApi = {
+  summary: () => request('/reports/summary'),
+  sales: (params) => request(`/reports/sales?${new URLSearchParams(params)}`),
+  inventory: () => request('/reports/inventory'),
+  profits: (params) => request(`/reports/profits?${new URLSearchParams(params)}`),
+}
