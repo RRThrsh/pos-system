@@ -37,6 +37,36 @@ exports.inventoryReport = async (req, res) => {
   })
 }
 
+exports.summary = async (req, res) => {
+  const [allSales, allProducts, users, allCustomers] = await Promise.all([
+    client.query(ref("sales:list"), { limit: 99999 }),
+    client.query(ref("products:list"), { limit: 99999 }),
+    client.query(ref("users:list")),
+    client.query(ref("customers:list"), { limit: 99999 }),
+  ])
+
+  const salesData = allSales.data
+  const productsData = allProducts.data
+
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const todaySales = salesData.filter((s) => new Date(s.createdAt) >= today)
+  const todayRevenue = todaySales.reduce((sum, s) => sum + s.total, 0)
+  const totalRevenue = salesData.reduce((sum, s) => sum + s.total, 0)
+  const lowStockCount = productsData.filter((p) => p.stock <= 10).length
+
+  res.json({
+    todaySales: todaySales.length,
+    todayRevenue,
+    totalSales: allSales.total,
+    totalRevenue,
+    totalProducts: allProducts.total,
+    lowStockCount,
+    totalUsers: users.length,
+    totalCustomers: allCustomers.total,
+  })
+}
+
 exports.profitsReport = async (req, res) => {
   const { dateFrom, dateTo } = req.query
   const result = await client.query(ref("sales:list"), { dateFrom, dateTo })
