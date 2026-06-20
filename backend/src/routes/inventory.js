@@ -5,6 +5,6 @@ const { authenticate, authorize } = require('../middleware/auth')
 const router = Router()
 
 router.get('/', authenticate, inventoryController.getMovements)
-router.post('/adjust', authenticate, authorize('admin'), inventoryController.adjust)
+router.post('/adjust', authenticate, authorize('admin', 'superadmin'), inventoryController.adjust)
 
 module.exports = router
