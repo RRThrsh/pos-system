@@ -8,6 +8,6 @@ router.get('/', authenticate, customerController.getAll)
 router.get('/:id', authenticate, customerController.getById)
 router.post('/', authenticate, customerController.create)
 router.put('/:id', authenticate, customerController.update)
-router.delete('/:id', authenticate, authorize('admin'), customerController.remove)
+router.delete('/:id', authenticate, authorize('admin', 'superadmin'), customerController.remove)
 
 module.exports = router
