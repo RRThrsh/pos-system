@@ -1,8 +1,17 @@
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { ToastProvider } from './context/ToastContext.jsx'
+import Login from './pages/auth/Login.jsx'
+
 function App() {
   return (
-    <div className="min-h-screen bg-gray-100">
-      <h1 className="text-3xl font-bold text-center pt-8">POS System</h1>
-    </div>
+    <BrowserRouter>
+      <ToastProvider>
+        <Routes>
+          <Route path="/login" element={<Login />} />
+          <Route path="*" element={<Navigate to="/login" replace />} />
+        </Routes>
+      </ToastProvider>
+    </BrowserRouter>
   )
 }
 
