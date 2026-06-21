@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { reportsApi, salesApi, productsApi, auditLogsApi } from '../../services/api.js'
 import Spinner from '../../components/Spinner.jsx'
 import {
@@ -46,16 +46,15 @@ function Dashboard() {
   const [bestSellers, setBestSellers] = useState([])
   const [activeUsers, setActiveUsers] = useState([])
   const [recentActivity, setRecentActivity] = useState([])
+  const initialLoad = useRef(true)
 
-  useEffect(() => {
-    setLoading(true)
-
+  const loadAll = () => {
     const now = new Date()
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
     const prevMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString()
     const prevMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59).toISOString()
 
-    Promise.all([
+    return Promise.all([
       reportsApi.summary(),
       reportsApi.dailySummaries({ period: chartPeriod }),
       salesApi.getAll({ limit: '5' }),
@@ -67,27 +66,37 @@ function Dashboard() {
       reportsApi.bestSellers({ period: chartPeriod, limit: '5' }),
       reportsApi.activeUsers(),
       auditLogsApi.getAll({ limit: '10' }),
-    ])
-      .then(([
-        summaryData, dailyRes, salesData, prodData,
-        profitsRes, prevProfitsRes, pmRes, hourlyRes, bestRes, activeRes, activityRes,
-      ]) => {
-        setSummary(summaryData)
-        setDailyData(dailyRes.dailySummaries || [])
-        setRecentSales(salesData.data || salesData.sales || salesData || [])
-        const allProducts = prodData.products || prodData.data || prodData || []
-        setLowStock(allProducts.filter((p) => p.stock <= 10))
-        setZeroStock(allProducts.filter((p) => p.stock === 0))
-        setProfitData(profitsRes)
-        setPrevProfit(prevProfitsRes)
-        setPaymentMethods(pmRes.paymentMethods || [])
-        setHourlySales(hourlyRes.hourlySales || [])
-        setBestSellers(bestRes.bestSellers || [])
-        setActiveUsers(activeRes.users || [])
-        setRecentActivity((activityRes.data || []).slice(0, 10))
-      })
+    ]).then(([
+      summaryData, dailyRes, salesData, prodData,
+      profitsRes, prevProfitsRes, pmRes, hourlyRes, bestRes, activeRes, activityRes,
+    ]) => {
+      setSummary(summaryData)
+      setDailyData(dailyRes.dailySummaries || [])
+      setRecentSales(salesData.data || salesData.sales || salesData || [])
+      const allProducts = prodData.products || prodData.data || prodData || []
+      setLowStock(allProducts.filter((p) => p.stock <= 10))
+      setZeroStock(allProducts.filter((p) => p.stock === 0))
+      setProfitData(profitsRes)
+      setPrevProfit(prevProfitsRes)
+      setPaymentMethods(pmRes.paymentMethods || [])
+      setHourlySales(hourlyRes.hourlySales || [])
+      setBestSellers(bestRes.bestSellers || [])
+      setActiveUsers(activeRes.users || [])
+      setRecentActivity((activityRes.data || []).slice(0, 10))
+    })
+  }
+
+  useEffect(() => {
+    loadAll()
       .catch((err) => setError(err.message || 'Failed to load data'))
       .finally(() => setLoading(false))
+  }, [])
+
+  useEffect(() => {
+    if (!initialLoad.current) {
+      loadAll().catch((err) => setError(err.message || 'Failed to load data'))
+    }
+    initialLoad.current = false
   }, [chartPeriod])
 
   const formatDate = (d) => {

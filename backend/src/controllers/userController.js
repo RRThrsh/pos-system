@@ -33,13 +33,20 @@ exports.create = async (req, res) => {
 }
 
 exports.update = async (req, res) => {
-  const { firstName, lastName, role, isActive, password } = req.body
+  const { firstName, lastName, role, isActive, password, currentPassword } = req.body
   const fields = {}
   if (firstName !== undefined) fields.firstName = firstName
   if (lastName !== undefined) fields.lastName = lastName
   if (role !== undefined) fields.role = role
   if (isActive !== undefined) fields.isActive = isActive
-  if (password) fields.password = bcrypt.hashSync(password, 10)
+  if (password) {
+    const existing = await client.query(ref("users:getById"), { id: req.params.id })
+    if (!existing) return res.status(404).json({ message: "User not found." })
+    if (!bcrypt.compareSync(currentPassword || '', existing.password)) {
+      return res.status(403).json({ message: "Current password is incorrect." })
+    }
+    fields.password = bcrypt.hashSync(password, 10)
+  }
 
   try {
     const updated = await client.mutation(ref("users:update"), { id: req.params.id, ...fields })
