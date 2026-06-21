@@ -10,5 +10,8 @@ router.get('/profits', authenticate, authorize('admin', 'superadmin'), reportCon
 router.get('/summary', authenticate, authorize('admin', 'superadmin'), reportController.summary)
 router.get('/best-sellers', authenticate, authorize('admin', 'superadmin'), reportController.bestSellers)
 router.get('/daily-summaries', authenticate, authorize('admin', 'superadmin'), reportController.dailySummaries)
+router.get('/payment-methods', authenticate, authorize('admin', 'superadmin'), reportController.paymentMethods)
+router.get('/hourly-sales', authenticate, authorize('admin', 'superadmin'), reportController.hourlySales)
+router.get('/active-users', authenticate, authorize('admin', 'superadmin'), reportController.activeUsersToday)
 
 module.exports = router

@@ -106,6 +106,61 @@ exports.dailySummaries = async (req, res) => {
   res.json({ dailySummaries: sorted })
 }
 
+exports.paymentMethods = async (req, res) => {
+  const { period = "daily", date } = req.query
+  const result = await client.query(ref("sales:list"), {})
+  const filtered = filterByPeriod(result.data, period, date)
+
+  const groups = {}
+  for (const sale of filtered) {
+    const method = sale.paymentMethod || "unknown"
+    if (!groups[method]) groups[method] = { method, count: 0, revenue: 0 }
+    groups[method].count++
+    groups[method].revenue += sale.total || 0
+  }
+
+  res.json({ paymentMethods: Object.values(groups) })
+}
+
+exports.hourlySales = async (req, res) => {
+  const { period = "daily", date } = req.query
+  const result = await client.query(ref("sales:list"), {})
+  const filtered = filterByPeriod(result.data, period, date)
+
+  const hours = {}
+  for (const sale of filtered) {
+    const hour = new Date(sale.createdAt).getHours()
+    if (!hours[hour]) hours[hour] = { hour, sales: 0, revenue: 0 }
+    hours[hour].sales++
+    hours[hour].revenue += sale.total || 0
+  }
+
+  const sorted = Array.from({ length: 24 }, (_, i) => hours[i] || { hour: i, sales: 0, revenue: 0 })
+  res.json({ hourlySales: sorted })
+}
+
+exports.activeUsersToday = async (req, res) => {
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const result = await client.query(ref("auditLogs:list"), {
+    dateFrom: today.toISOString(),
+    limit: 99999,
+  })
+
+  const unique = new Set()
+  for (const log of result.data || []) {
+    if (log.username) unique.add(log.username)
+  }
+
+  const now = new Date()
+  const activeToday = Array.from(unique).map((username) => ({
+    username,
+    lastSeen: result.data.filter((l) => l.username === username).pop()?.createdAt || now.toISOString(),
+  }))
+
+  res.json({ count: activeToday.length, users: activeToday })
+}
+
 exports.profitsReport = async (req, res) => {
   const { dateFrom, dateTo } = req.query
   const result = await client.query(ref("sales:list"), { dateFrom, dateTo })
