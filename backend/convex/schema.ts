@@ -82,11 +82,61 @@ export default defineSchema({
     createdAt: v.string(),
   }).index("by_createdAt", ["createdAt"]),
 
+  permissions: defineTable({
+    role: v.string(),
+    page: v.string(),
+    canRead: v.boolean(),
+    canWrite: v.boolean(),
+    canExecute: v.boolean(),
+    updatedAt: v.string(),
+  }).index("by_role", ["role"]).index("by_role_page", ["role", "page"]),
+
   config: defineTable({
     key: v.string(),
     value: v.string(),
     updatedAt: v.string(),
   }).index("by_key", ["key"]),
+
+  purchaseOrders: defineTable({
+    supplierId: v.id("suppliers"),
+    supplierName: v.string(),
+    items: v.array(v.object({
+      productId: v.id("products"),
+      productName: v.string(),
+      qty: v.number(),
+      unitCost: v.number(),
+      total: v.number(),
+    })),
+    subtotal: v.number(),
+    status: v.union(v.literal("pending"), v.literal("ordered"), v.literal("received"), v.literal("cancelled")),
+    notes: v.optional(v.string()),
+    createdBy: v.optional(v.id("users")),
+    createdAt: v.string(),
+    updatedAt: v.string(),
+  }),
+
+  expenses: defineTable({
+    description: v.string(),
+    amount: v.number(),
+    category: v.string(),
+    paymentMethod: v.string(),
+    reference: v.optional(v.string()),
+    createdBy: v.optional(v.id("users")),
+    createdAt: v.string(),
+  }).index("by_createdAt", ["createdAt"]),
+
+  promoCodes: defineTable({
+    code: v.string(),
+    discountType: v.union(v.literal("percentage"), v.literal("fixed")),
+    discountValue: v.number(),
+    minPurchase: v.optional(v.number()),
+    maxUses: v.optional(v.number()),
+    useCount: v.number(),
+    expiresAt: v.optional(v.string()),
+    isActive: v.boolean(),
+    createdBy: v.optional(v.id("users")),
+    createdAt: v.string(),
+  }).index("by_code", ["code"]),
 
   supplierProducts: defineTable({
     supplierId: v.id("suppliers"),
