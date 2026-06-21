@@ -40,7 +40,7 @@ export const create = mutation({
       productId: v.id("products"),
       qty: v.number(),
     })),
-    customerId: v.optional(v.id("customers")),
+    transactionId: v.optional(v.string()),
     paymentMethod: v.optional(v.string()),
     amountPaid: v.optional(v.number()),
     discount: v.optional(v.number()),
@@ -48,7 +48,7 @@ export const create = mutation({
     orderType: v.optional(v.string()),
     createdBy: v.optional(v.id("users")),
   },
-  handler: async (ctx, { items, customerId, paymentMethod, amountPaid, discount, discountType, orderType, createdBy }) => {
+  handler: async (ctx, { items, transactionId, paymentMethod, amountPaid, discount, discountType, orderType, createdBy }) => {
     const saleItems = []
     let subtotal = 0
 
@@ -81,7 +81,7 @@ export const create = mutation({
       discount: discAmt,
       discountType: discountType ?? "fixed",
       orderType: orderType ?? "dine-in",
-      customerId,
+      transactionId,
       paymentMethod: paymentMethod ?? "cash",
       amountPaid: amountPaid ?? total,
       change: change > 0 ? change : 0,

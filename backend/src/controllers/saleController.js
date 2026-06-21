@@ -18,7 +18,7 @@ exports.getById = async (req, res) => {
 }
 
 exports.create = async (req, res) => {
-  const { items, customerId, paymentMethod, amountPaid } = req.body
+  const { items, transactionId, paymentMethod, amountPaid } = req.body
 
   if (!items || !items.length) {
     return res.status(400).json({ message: "Sale must include at least one item." })
@@ -27,7 +27,7 @@ exports.create = async (req, res) => {
   try {
     const id = await client.mutation(ref("sales:create"), {
       items: items.map((i) => ({ productId: i.productId, qty: i.qty })),
-      customerId,
+      transactionId,
       paymentMethod: paymentMethod || "cash",
       amountPaid: amountPaid ? Number(amountPaid) : undefined,
       createdBy: req.user?.id,

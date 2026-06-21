@@ -10,7 +10,7 @@ const cards = [
   { key: 'totalProducts', label: 'Total Products', color: 'bg-purple-500' },
   { key: 'lowStockCount', label: 'Low Stock Items', color: 'bg-orange-500' },
   { key: 'totalUsers', label: 'Total Users', color: 'bg-pink-500' },
-  { key: 'totalCustomers', label: 'Total Customers', color: 'bg-cyan-500' },
+
 ]
 
 function Dashboard() {
@@ -60,7 +60,7 @@ function Dashboard() {
     { label: 'Today Sales', value: summary?.todaySales || 0, color: 'bg-blue-500' },
     { label: 'Total Sales', value: summary?.totalSales || 0, color: 'bg-indigo-500' },
     { label: 'Products', value: summary?.totalProducts || 0, color: 'bg-purple-500' },
-    { label: 'Customers', value: summary?.totalCustomers || 0, color: 'bg-cyan-500' },
+
     { label: 'Users', value: summary?.totalUsers || 0, color: 'bg-pink-500' },
   ]
   const maxBar = Math.max(...barData.map((b) => b.value), 1)

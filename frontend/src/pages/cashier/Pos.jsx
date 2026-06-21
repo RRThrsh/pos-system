@@ -100,7 +100,7 @@ function Pos() {
           price: c.price,
           quantity: c.quantity,
         })),
-        customerId: undefined,
+        transactionId: `TXN-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`,
         paymentMethod,
         amountPaid: parseFloat(amountPaid) || total,
         discount: discValue,

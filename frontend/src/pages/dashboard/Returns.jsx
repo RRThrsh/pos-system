@@ -76,7 +76,7 @@ function Returns() {
             <thead className="bg-gray-50 text-gray-600">
               <tr>
                 <th className="text-left px-4 py-3 font-medium">Date</th>
-                <th className="text-left px-4 py-3 font-medium">Customer</th>
+                <th className="text-left px-4 py-3 font-medium">Transaction ID</th>
                 <th className="text-right px-4 py-3 font-medium">Items</th>
                 <th className="text-right px-4 py-3 font-medium">Total</th>
                 <th className="text-left px-4 py-3 font-medium">Payment</th>
@@ -87,7 +87,7 @@ function Returns() {
               {items.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE).map((sale) => (
                 <tr key={sale._id || sale.id} className="hover:bg-gray-50">
                   <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{formatDate(sale.createdAt || sale.date)}</td>
-                  <td className="px-4 py-3 text-gray-900">{sale.customer?.name || sale.customerName || 'Walk-in'}</td>
+                  <td className="px-4 py-3 text-gray-900 font-mono text-xs">{sale.transactionId || '—'}</td>
                   <td className="px-4 py-3 text-right">{sale.items?.reduce((s, i) => s + i.qty, 0) || 0}</td>
                   <td className="px-4 py-3 text-right font-medium">&#8369;{Number(sale.total || 0).toLocaleString()}</td>
                   <td className="px-4 py-3 capitalize text-gray-600">{sale.paymentMethod || sale.payment}</td>

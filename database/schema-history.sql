@@ -55,7 +55,7 @@ CREATE TABLE sales (
     discount REAL NOT NULL DEFAULT 0,
     discountType TEXT DEFAULT 'fixed',
     orderType TEXT NOT NULL DEFAULT 'dine-in',
-    customerId TEXT REFERENCES customers(_id),
+    transactionId TEXT,
     paymentMethod TEXT NOT NULL DEFAULT 'cash',
     amountPaid REAL NOT NULL,
     change REAL NOT NULL DEFAULT 0,
@@ -130,3 +130,4 @@ CREATE INDEX idx_sp_product ON supplier_products(productId);
 -- v4  - Added unitValue, unit columns to products
 -- v5  - Removed customers table
 -- v6  - Added supplier_products table with price history tracking
+-- v7  - Replaced customerId with transactionId on sales table

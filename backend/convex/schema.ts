@@ -43,7 +43,7 @@ export default defineSchema({
     discount: v.number(),
     discountType: v.optional(v.string()),
     orderType: v.string(),
-    customerId: v.optional(v.id("customers")),
+    transactionId: v.optional(v.string()),
     paymentMethod: v.string(),
     amountPaid: v.number(),
     change: v.number(),
