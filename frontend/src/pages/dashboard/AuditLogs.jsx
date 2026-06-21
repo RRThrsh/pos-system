@@ -27,21 +27,17 @@ function AuditLogs() {
   const { addToast } = useToast()
   const [logs, setLogs] = useState([])
   const [loading, setLoading] = useState(true)
-  const [actionFilter, setActionFilter] = useState('')
-  const [total, setTotal] = useState(0)
   const scrollRef = useRef(null)
 
-  const load = (action) => {
+  const load = () => {
     setLoading(true)
-    const params = { limit: '500' }
-    if (action) params.action = action
-    auditLogsApi.getAll(params)
-      .then((res) => { setLogs(res.data || []); setTotal(res.total || 0) })
+    auditLogsApi.getAll({ limit: '500' })
+      .then((res) => { setLogs(res.data || []) })
       .catch((err) => addToast(err.message || 'Failed to load', 'error'))
       .finally(() => setLoading(false))
   }
 
-  useEffect(() => { load(actionFilter) }, [actionFilter])
+  useEffect(() => { load() }, [])
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -49,20 +45,9 @@ function AuditLogs() {
     }
   }, [logs])
 
-  const allActions = Object.keys(actionLabels)
-
   return (
     <div className="flex flex-col h-[calc(100vh-8rem)]">
-      <div className="flex items-center justify-between mb-4 shrink-0">
-        <h1 className="text-2xl font-bold text-gray-800">Audit Logs</h1>
-        <select value={actionFilter} onChange={(e) => setActionFilter(e.target.value)}
-          className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 bg-white">
-          <option value="">All ({total})</option>
-          {allActions.map((key) => (
-            <option key={key} value={key}>{actionLabels[key]} ({key})</option>
-          ))}
-        </select>
-      </div>
+      <h1 className="text-2xl font-bold text-gray-800 mb-4 shrink-0">Audit Logs</h1>
 
       {loading ? <Spinner /> : (
         <div ref={scrollRef} className="flex-1 bg-[#0d1117] rounded-lg border border-[#30363d] overflow-y-auto font-mono text-xs p-4 leading-5">
