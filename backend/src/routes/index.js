@@ -10,6 +10,10 @@ const reportRoutes = require('./reports')
 const supplierRoutes = require('./suppliers')
 const auditRoutes = require('./audit')
 const configRoutes = require('./config')
+const permissionRoutes = require('./permissions')
+const purchaseOrderRoutes = require('./purchaseOrders')
+const expenseRoutes = require('./expenses')
+const promoCodeRoutes = require('./promoCodes')
 
 const router = Router()
 
@@ -23,5 +27,9 @@ router.use('/reports', reportRoutes)
 router.use('/suppliers', supplierRoutes)
 router.use('/audit-logs', auditRoutes)
 router.use('/config', configRoutes)
+router.use('/permissions', permissionRoutes)
+router.use('/purchase-orders', purchaseOrderRoutes)
+router.use('/expenses', expenseRoutes)
+router.use('/promo-codes', promoCodeRoutes)
 
 module.exports = router
