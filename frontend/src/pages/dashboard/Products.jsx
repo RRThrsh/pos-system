@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { productsApi, categoriesApi } from '../../services/api.js'
 import Modal from '../../components/Modal.jsx'
 import Spinner from '../../components/Spinner.jsx'
+import Pagination, { PAGE_SIZE } from '../../components/Pagination.jsx'
 import { useToast } from '../../context/ToastContext.jsx'
 import JsBarcode from 'jsbarcode'
 
@@ -18,6 +19,7 @@ function Products() {
   const [editing, setEditing] = useState(null)
   const [form, setForm] = useState(emptyForm)
   const [search, setSearch] = useState('')
+  const [page, setPage] = useState(1)
   const barcodeSvg = useRef(null)
 
   useEffect(() => {
@@ -42,7 +44,7 @@ function Products() {
       .finally(() => setLoading(false))
   }
 
-  useEffect(() => { load() }, [search])
+  useEffect(() => { setPage(1); load() }, [search])
 
   const openCreate = () => {
     setEditing(null)
@@ -141,7 +143,7 @@ function Products() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {items.map((item) => (
+              {items.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE).map((item) => (
                 <tr key={item._id || item.id} className="hover:bg-gray-50">
                   <td className="px-4 py-3 font-medium text-gray-900">{item.name}</td>
                   <td className="px-4 py-3 text-gray-600">{item.sku}</td>
@@ -161,6 +163,7 @@ function Products() {
               )}
             </tbody>
           </table>
+          <Pagination items={items} currentPage={page} onPageChange={setPage} />
         </div>
       )}
 

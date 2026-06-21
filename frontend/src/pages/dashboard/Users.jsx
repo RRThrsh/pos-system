@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { usersApi } from '../../services/api.js'
 import Modal from '../../components/Modal.jsx'
 import Spinner from '../../components/Spinner.jsx'
+import Pagination, { PAGE_SIZE } from '../../components/Pagination.jsx'
 import { useToast } from '../../context/ToastContext.jsx'
 import { useAuth } from '../../context/AuthContext.jsx'
 
@@ -15,6 +16,7 @@ function Users() {
   const [modalOpen, setModalOpen] = useState(false)
   const [editing, setEditing] = useState(null)
   const [form, setForm] = useState(emptyForm)
+  const [page, setPage] = useState(1)
 
   const load = () => {
     setLoading(true)
@@ -90,7 +92,7 @@ function Users() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {items.map((item) => (
+              {items.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE).map((item) => (
                 <tr key={item._id || item.id} className="hover:bg-gray-50">
                   <td className="px-4 py-3 font-medium text-gray-900">{item.firstName} {item.lastName}</td>
                   <td className="px-4 py-3 text-gray-600">{item.username}</td>
@@ -115,6 +117,7 @@ function Users() {
               )}
             </tbody>
           </table>
+          <Pagination items={items} currentPage={page} onPageChange={setPage} />
         </div>
       )}
 

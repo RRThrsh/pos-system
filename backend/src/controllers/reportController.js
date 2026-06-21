@@ -38,11 +38,10 @@ exports.inventoryReport = async (req, res) => {
 }
 
 exports.summary = async (req, res) => {
-  const [allSales, allProducts, users, allCustomers] = await Promise.all([
+  const [allSales, allProducts, users] = await Promise.all([
     client.query(ref("sales:list"), { limit: 99999 }),
     client.query(ref("products:list"), { limit: 99999 }),
     client.query(ref("users:list")),
-    client.query(ref("customers:list"), { limit: 99999 }),
   ])
 
   const salesData = allSales.data
@@ -63,7 +62,6 @@ exports.summary = async (req, res) => {
     totalProducts: allProducts.total,
     lowStockCount,
     totalUsers: users.length,
-    totalCustomers: allCustomers.total,
   })
 }
 

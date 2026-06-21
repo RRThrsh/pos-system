@@ -12,7 +12,6 @@ import Monitoring from './pages/dashboard/Monitoring.jsx'
 import Analytics from './pages/dashboard/Analytics.jsx'
 import Products from './pages/dashboard/Products.jsx'
 import Categories from './pages/dashboard/Categories.jsx'
-import Customers from './pages/dashboard/Customers.jsx'
 import Pos from './pages/cashier/Pos.jsx'
 import SalesHistory from './pages/dashboard/SalesHistory.jsx'
 import Inventory from './pages/dashboard/Inventory.jsx'
@@ -39,7 +38,6 @@ function App() {
               <Route path="/dashboard/pos" element={<Pos />} />
               <Route path="/dashboard/products" element={<Products />} />
               <Route path="/dashboard/categories" element={<Categories />} />
-              <Route path="/dashboard/customers" element={<Customers />} />
               <Route path="/dashboard/sales" element={<SalesHistory />} />
               <Route path="/dashboard/inventory" element={<Inventory />} />
               <Route path="/dashboard/reports" element={<Reports />} />

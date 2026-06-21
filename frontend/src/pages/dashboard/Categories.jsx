@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { categoriesApi } from '../../services/api.js'
 import Modal from '../../components/Modal.jsx'
 import Spinner from '../../components/Spinner.jsx'
+import Pagination, { PAGE_SIZE } from '../../components/Pagination.jsx'
 import { useToast } from '../../context/ToastContext.jsx'
 
 function Categories() {
@@ -11,6 +12,7 @@ function Categories() {
   const [modalOpen, setModalOpen] = useState(false)
   const [editing, setEditing] = useState(null)
   const [name, setName] = useState('')
+  const [page, setPage] = useState(1)
 
   const load = () => {
     setLoading(true)
@@ -71,7 +73,7 @@ function Categories() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {items.map((item) => (
+              {items.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE).map((item) => (
                 <tr key={item._id || item.id} className="hover:bg-gray-50">
                   <td className="px-4 py-3 font-medium text-gray-900">{item.name}</td>
                   <td className="px-4 py-3 text-center">
@@ -85,6 +87,7 @@ function Categories() {
               )}
             </tbody>
           </table>
+          <Pagination items={items} currentPage={page} onPageChange={setPage} />
         </div>
       )}
 

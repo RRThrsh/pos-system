@@ -31,14 +31,6 @@ export default defineSchema({
     updatedAt: v.string(),
   }).index("by_sku", ["sku"]),
 
-  customers: defineTable({
-    name: v.string(),
-    phone: v.string(),
-    email: v.string(),
-    address: v.string(),
-    createdAt: v.string(),
-  }),
-
   sales: defineTable({
     items: v.array(v.object({
       productId: v.id("products"),

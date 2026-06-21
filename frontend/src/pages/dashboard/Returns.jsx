@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { salesApi } from '../../services/api.js'
 import Modal from '../../components/Modal.jsx'
 import Spinner from '../../components/Spinner.jsx'
+import Pagination, { PAGE_SIZE } from '../../components/Pagination.jsx'
 import { useToast } from '../../context/ToastContext.jsx'
 
 function Returns() {
@@ -11,6 +12,7 @@ function Returns() {
   const [viewItem, setViewItem] = useState(null)
   const [returnItems, setReturnItems] = useState([])
   const [processing, setProcessing] = useState(false)
+  const [page, setPage] = useState(1)
 
   const load = () => {
     setLoading(true)
@@ -82,7 +84,7 @@ function Returns() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {items.map((sale) => (
+              {items.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE).map((sale) => (
                 <tr key={sale._id || sale.id} className="hover:bg-gray-50">
                   <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{formatDate(sale.createdAt || sale.date)}</td>
                   <td className="px-4 py-3 text-gray-900">{sale.customer?.name || sale.customerName || 'Walk-in'}</td>
@@ -99,6 +101,7 @@ function Returns() {
               )}
             </tbody>
           </table>
+          <Pagination items={items} currentPage={page} onPageChange={setPage} />
         </div>
       )}
 

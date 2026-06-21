@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { suppliersApi } from '../../services/api.js'
 import Modal from '../../components/Modal.jsx'
 import Spinner from '../../components/Spinner.jsx'
+import Pagination, { PAGE_SIZE } from '../../components/Pagination.jsx'
 import { useToast } from '../../context/ToastContext.jsx'
 
 const emptyForm = { name: '', contact: '', phone: '', email: '', address: '' }
@@ -14,6 +15,7 @@ function Suppliers() {
   const [editing, setEditing] = useState(null)
   const [form, setForm] = useState(emptyForm)
   const [search, setSearch] = useState('')
+  const [page, setPage] = useState(1)
 
   const load = () => {
     setLoading(true)
@@ -23,7 +25,7 @@ function Suppliers() {
       .finally(() => setLoading(false))
   }
 
-  useEffect(() => { load() }, [search])
+  useEffect(() => { setPage(1); load() }, [search])
 
   const openCreate = () => { setEditing(null); setForm(emptyForm); setModalOpen(true) }
   const openEdit = (item) => {
@@ -91,7 +93,7 @@ function Suppliers() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {items.map((item) => (
+              {items.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE).map((item) => (
                 <tr key={item._id || item.id} className="hover:bg-gray-50">
                   <td className="px-4 py-3 font-medium text-gray-900">{item.name}</td>
                   <td className="px-4 py-3 text-gray-600">{item.contact}</td>
@@ -109,6 +111,7 @@ function Suppliers() {
               )}
             </tbody>
           </table>
+          <Pagination items={items} currentPage={page} onPageChange={setPage} />
         </div>
       )}
 

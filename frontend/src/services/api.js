@@ -53,14 +53,6 @@ export const categoriesApi = {
   remove: (id) => request(`/categories/${id}`, { method: 'DELETE' }),
 }
 
-export const customersApi = {
-  getAll: (params) => request(`/customers?${new URLSearchParams(params)}`),
-  getById: (id) => request(`/customers/${id}`),
-  create: (payload) => request('/customers', { method: 'POST', body: JSON.stringify(payload) }),
-  update: (id, payload) => request(`/customers/${id}`, { method: 'PUT', body: JSON.stringify(payload) }),
-  remove: (id) => request(`/customers/${id}`, { method: 'DELETE' }),
-}
-
 export const salesApi = {
   getAll: (params) => request(`/sales?${new URLSearchParams(params)}`),
   getById: (id) => request(`/sales/${id}`),

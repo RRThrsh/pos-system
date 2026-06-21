@@ -47,18 +47,6 @@ CREATE TABLE products (
 CREATE UNIQUE INDEX idx_products_sku ON products(sku);
 
 -- =============================================
--- Customers
--- =============================================
-CREATE TABLE customers (
-    _id TEXT PRIMARY KEY,
-    name TEXT NOT NULL,
-    phone TEXT NOT NULL DEFAULT '',
-    email TEXT NOT NULL DEFAULT '',
-    address TEXT NOT NULL DEFAULT '',
-    createdAt TEXT NOT NULL
-);
-
--- =============================================
 -- Sales
 -- =============================================
 CREATE TABLE sales (
@@ -124,3 +112,4 @@ CREATE INDEX idx_inventory_productId ON inventory_movements(productId);
 -- v2  - Added suppliers table
 -- v3  - Added discount, discountType, orderType columns to sales
 -- v4  - Added unitValue, unit columns to products
+-- v5  - Removed customers table
