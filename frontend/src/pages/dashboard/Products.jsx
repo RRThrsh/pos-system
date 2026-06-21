@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef } from 'react'
-import { productsApi, categoriesApi } from '../../services/api.js'
+import { productsApi, categoriesApi, downloadCSV } from '../../services/api.js'
 import Modal from '../../components/Modal.jsx'
 import Spinner from '../../components/Spinner.jsx'
 import Pagination, { PAGE_SIZE } from '../../components/Pagination.jsx'
 import { useToast } from '../../context/ToastContext.jsx'
+import { usePermission } from '../../hooks/usePermission.js'
 import JsBarcode from 'jsbarcode'
 
 const emptyForm = { name: '', sku: '', price: '', cost: '', category: '', stock: '', barcode: '', unitValue: '', unit: '' }
@@ -12,6 +13,7 @@ const units = ['pcs', 'ml', 'L', 'g', 'kg', 'box', 'pack', 'sack', 'bottle', 'ca
 
 function Products() {
   const { addToast } = useToast()
+  const { canWrite, canExecute } = usePermission('Products')
   const [items, setItems] = useState([])
   const [categories, setCategories] = useState([])
   const [loading, setLoading] = useState(true)
@@ -21,6 +23,40 @@ function Products() {
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
   const barcodeSvg = useRef(null)
+  const printSvg = useRef(null)
+  const [printModalOpen, setPrintModalOpen] = useState(false)
+  const [printProduct, setPrintProduct] = useState(null)
+  const [printQty, setPrintQty] = useState(1)
+
+  const openPrintBarcode = (product) => {
+    setPrintProduct(product)
+    setPrintQty(1)
+    setPrintModalOpen(true)
+  }
+
+  useEffect(() => {
+    if (printSvg.current && printProduct?.barcode) {
+      try {
+        JsBarcode(printSvg.current, printProduct.barcode, { format: 'CODE128', width: 2, height: 60, displayValue: true, fontSize: 16 })
+      } catch { }
+    }
+  }, [printProduct])
+
+  const handlePrintBarcode = () => {
+    const printWindow = window.open('', '_blank')
+    if (!printWindow) return
+    let labels = ''
+    for (let i = 0; i < printQty; i++) {
+      labels += `<div style="text-align:center;margin:10px;padding:10px;border:1px dashed #ccc;display:inline-block">
+        <div style="font-weight:bold;margin-bottom:4px">${printProduct?.name}</div>
+        <div>₱${Number(printProduct?.price || 0).toLocaleString()}</div>
+        <img src="${printSvg.current?.outerHTML ? 'data:image/svg+xml,' + encodeURIComponent(printSvg.current.outerHTML) : ''}" style="width:200px;height:60px" />
+      </div>`
+    }
+    printWindow.document.write(`<html><head><title>Print Barcode</title></head><body style="text-align:center">${labels}<script>window.print();window.close();<\/script></body></html>`)
+    printWindow.document.close()
+    setPrintModalOpen(false)
+  }
 
   useEffect(() => {
     if (barcodeSvg.current && form.barcode) {
@@ -113,10 +149,13 @@ function Products() {
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
-        <input type="text" placeholder="Search products..." value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="w-full max-w-xs rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20" />
-        <button onClick={openCreate} className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-indigo-500 transition-colors">+ Add Product</button>
+        <div className="flex items-center gap-2">
+          <input type="text" placeholder="Search products..." value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full max-w-xs rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20" />
+          <button onClick={() => downloadCSV(['name', 'sku', 'price', 'cost', 'category', 'stock', 'barcode'], items, `products-${new Date().toISOString().slice(0, 10)}.csv`)} className="border border-gray-300 text-gray-600 px-4 py-2 rounded-lg text-sm hover:bg-gray-50 min-w-[120px]">Export CSV</button>
+        </div>
+        {canWrite && <button onClick={openCreate} className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-indigo-500 transition-colors">+ Add Product</button>}
       </div>
 
       {loading ? <Spinner /> : (
@@ -145,8 +184,9 @@ function Products() {
                   <td className="px-4 py-3 text-right">&#8369;{Number(item.cost).toLocaleString()}</td>
                   <td className="px-4 py-3 text-right">{item.stock}</td>
                   <td className="px-4 py-3 text-center">
-                    <button onClick={() => openEdit(item)} className="text-indigo-600 hover:text-indigo-800 mr-3">Edit</button>
-                    <button onClick={() => handleDelete(item._id || item.id)} className="text-red-600 hover:text-red-800">Delete</button>
+                    <button onClick={() => openPrintBarcode(item)} className="text-gray-500 hover:text-gray-700 mr-2" title="Print Barcode"><svg className="w-4 h-4 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6.72 14.84l-2.12 2.12a3 3 0 0 0 0 4.24 3 3 0 0 0 4.24 0l2.12-2.12m0-11.28l2.12-2.12a3 3 0 0 1 4.24 0 3 3 0 0 1 0 4.24l-2.12 2.12M14.84 6.72l-8.12 8.12" /></svg></button>
+                    {canWrite && <button onClick={() => openEdit(item)} className="text-indigo-600 hover:text-indigo-800 mr-3">Edit</button>}
+                    {canExecute && <button onClick={() => handleDelete(item._id || item.id)} className="text-red-600 hover:text-red-800">Delete</button>}
                   </td>
                 </tr>
               ))}
@@ -225,6 +265,26 @@ function Products() {
             <button type="submit" className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-indigo-500 transition-colors">{editing ? 'Update' : 'Create'}</button>
           </div>
         </form>
+      </Modal>
+
+      <Modal isOpen={printModalOpen} onClose={() => setPrintModalOpen(false)} title="Print Barcode Label">
+        <div className="space-y-4 text-center">
+          {printProduct && (
+            <div className="bg-white border rounded-lg p-4 inline-block">
+              <div className="font-semibold mb-1">{printProduct.name}</div>
+              <div className="text-lg mb-2">₱{Number(printProduct.price).toLocaleString()}</div>
+              <svg ref={printSvg} />
+            </div>
+          )}
+          <div>
+            <label className="block text-sm text-gray-600 mb-1">Number of copies</label>
+            <input type="number" min={1} max={100} value={printQty} onChange={(e) => setPrintQty(Number(e.target.value))} className="border rounded-lg px-3 py-2 text-sm w-24 text-center" />
+          </div>
+          <div className="flex justify-end gap-2">
+            <button onClick={() => setPrintModalOpen(false)} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg">Cancel</button>
+            <button onClick={handlePrintBarcode} className="px-4 py-2 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">Print</button>
+          </div>
+        </div>
       </Modal>
     </div>
   )
