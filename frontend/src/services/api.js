@@ -23,6 +23,7 @@ export const authApi = {
       method: 'POST',
       body: JSON.stringify(payload),
     }),
+  logout: () => request('/auth/logout', { method: 'POST' }),
   me: () => request('/auth/me'),
   forgotPassword: (email) =>
     request('/auth/forgot-password', {
@@ -74,6 +75,10 @@ export const suppliersApi = {
   productsBySupplier: (id) => request(`/suppliers/${id}/products`),
   compareByProduct: (params) => request(`/suppliers/compare/product?${new URLSearchParams(params)}`),
   setProductPrice: (payload) => request('/suppliers/products/price', { method: 'POST', body: JSON.stringify(payload) }),
+}
+
+export const auditLogsApi = {
+  getAll: (params) => request(`/audit-logs?${new URLSearchParams(params)}`),
 }
 
 export const reportsApi = {

@@ -1,5 +1,6 @@
 const bcrypt = require("bcryptjs")
 const { client, ref } = require("../convex")
+const audit = require("../services/audit")
 
 exports.getAll = async (req, res) => {
   const users = await client.query(ref("users:list"))
@@ -21,6 +22,7 @@ exports.create = async (req, res) => {
       role: role || "cashier",
     })
     const user = await client.query(ref("users:getById"), { id })
+    await audit.log("create_user", req, { details: `Created user: ${user.firstName} ${user.lastName} (${user.username})`, itemName: user.username })
     res.status(201).json({ id: user._id, firstName: user.firstName, lastName: user.lastName, username: user.username, role: user.role })
   } catch (error) {
     if (error.message === "Username already exists") {
@@ -41,6 +43,7 @@ exports.update = async (req, res) => {
 
   try {
     const updated = await client.mutation(ref("users:update"), { id: req.params.id, ...fields })
+    await audit.log("update_user", req, { details: `Updated user: ${updated.username}`, itemName: updated.username })
     res.json({ id: updated._id, firstName: updated.firstName, lastName: updated.lastName, username: updated.username, role: updated.role, isActive: updated.isActive })
   } catch (error) {
     if (error.message === "User not found") {
@@ -53,6 +56,7 @@ exports.update = async (req, res) => {
 exports.remove = async (req, res) => {
   try {
     await client.mutation(ref("users:remove"), { id: req.params.id })
+    await audit.log("delete_user", req, { details: `Deleted user ${req.params.id}` })
     res.json({ message: "User deleted." })
   } catch (error) {
     if (error.message === "User not found") {

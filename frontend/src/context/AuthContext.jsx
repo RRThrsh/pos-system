@@ -42,6 +42,7 @@ function AuthProvider({ children }) {
   }, [])
 
   const logout = useCallback(() => {
+    authApi.logout().catch(() => {})
     localStorage.removeItem('remember')
     localStorage.removeItem('token')
     localStorage.removeItem('user')

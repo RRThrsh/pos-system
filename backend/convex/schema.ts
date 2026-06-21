@@ -73,6 +73,15 @@ export default defineSchema({
     createdAt: v.string(),
   }).index("by_productId", ["productId"]),
 
+  auditLogs: defineTable({
+    userId: v.optional(v.string()),
+    username: v.string(),
+    action: v.string(),
+    details: v.optional(v.string()),
+    ip: v.optional(v.string()),
+    createdAt: v.string(),
+  }).index("by_createdAt", ["createdAt"]),
+
   supplierProducts: defineTable({
     supplierId: v.id("suppliers"),
     productId: v.id("products"),

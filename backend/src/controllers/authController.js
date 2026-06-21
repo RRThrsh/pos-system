@@ -2,6 +2,7 @@ const bcrypt = require("bcryptjs")
 const jwt = require("jsonwebtoken")
 const config = require("../config")
 const { client, ref } = require("../convex")
+const audit = require("../services/audit")
 
 exports.register = async (req, res) => {
   const { username, password, confirmPassword, firstName, lastName, role } = req.body
@@ -55,15 +56,13 @@ exports.login = async (req, res) => {
   }
 
   const user = await client.query(ref("users:getByUsername"), { username })
-  if (!user) {
-    return res.status(401).json({ message: "Invalid username or password." })
-  }
-
-  if (!bcrypt.compareSync(password, user.password)) {
+  if (!user || !bcrypt.compareSync(password, user.password)) {
+    await audit.log("login_failed", req, { username, details: `Failed login attempt for ${username}` })
     return res.status(401).json({ message: "Invalid username or password." })
   }
 
   if (!user.isActive) {
+    await audit.log("login_failed", req, { username, details: `Deactivated account: ${username}` })
     return res.status(403).json({ message: "Account is deactivated." })
   }
 
@@ -73,10 +72,17 @@ exports.login = async (req, res) => {
     { expiresIn: config.jwtExpiresIn }
   )
 
+  await audit.log("login", req, { username, details: "Successful login" })
+
   res.json({
     token,
     user: { id: user._id, firstName: user.firstName, lastName: user.lastName, username: user.username, role: user.role },
   })
+}
+
+exports.logout = async (req, res) => {
+  await audit.log("logout", req, { details: "User logout" })
+  res.json({ message: "Logged out." })
 }
 
 exports.getMe = async (req, res) => {

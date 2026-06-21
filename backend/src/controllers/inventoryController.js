@@ -1,4 +1,5 @@
 const { client, ref } = require("../convex")
+const audit = require("../services/audit")
 
 exports.getMovements = async (req, res) => {
   const { productId, type } = req.query
@@ -25,6 +26,7 @@ exports.adjust = async (req, res) => {
       reason: reason || "",
     })
     const product = await client.query(ref("products:getById"), { id: productId })
+    await audit.log("adjust_inventory", req, { details: `${type === "in" ? "Added" : "Removed"} ${quantity} of ${product.name} (${reason || "no reason"})`, itemName: product.name })
     res.json({ product, movementId })
   } catch (error) {
     if (error.message === "Product not found") {

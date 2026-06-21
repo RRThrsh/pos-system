@@ -122,6 +122,20 @@ CREATE INDEX idx_sp_supplier ON supplier_products(supplierId);
 CREATE INDEX idx_sp_product ON supplier_products(productId);
 
 -- =============================================
+-- Audit Logs
+-- =============================================
+CREATE TABLE audit_logs (
+    _id TEXT PRIMARY KEY,
+    userId TEXT REFERENCES users(_id),
+    username TEXT NOT NULL,
+    action TEXT NOT NULL,
+    details TEXT DEFAULT '',
+    ip TEXT DEFAULT '',
+    createdAt TEXT NOT NULL
+);
+CREATE INDEX idx_audit_createdAt ON audit_logs(createdAt);
+
+-- =============================================
 -- Migration History
 -- =============================================
 -- v1  - Initial schema: users, categories, products, customers, sales, inventory_movements
@@ -131,3 +145,4 @@ CREATE INDEX idx_sp_product ON supplier_products(productId);
 -- v5  - Removed customers table
 -- v6  - Added supplier_products table with price history tracking
 -- v7  - Replaced customerId with transactionId on sales table
+-- v8  - Added audit_logs table for user activity tracking

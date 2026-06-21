@@ -1,4 +1,5 @@
 const { client, ref } = require("../convex")
+const audit = require("../services/audit")
 
 exports.getAll = async (req, res) => {
   const { search, page = 1, limit = 20 } = req.query
@@ -27,13 +28,15 @@ exports.create = async (req, res) => {
     email: email || "",
     address: address || "",
   })
-  const supplier = await client.query(ref("suppliers:getById"), { id })
-  res.status(201).json(supplier)
+    const supplier = await client.query(ref("suppliers:getById"), { id })
+    await audit.log("create_supplier", req, { details: `Created supplier: ${name}`, itemName: name })
+    res.status(201).json(supplier)
 }
 
 exports.update = async (req, res) => {
   try {
     const updated = await client.mutation(ref("suppliers:update"), { id: req.params.id, ...req.body })
+    await audit.log("update_supplier", req, { details: `Updated supplier: ${updated?.name || req.params.id}` })
     res.json(updated)
   } catch (error) {
     if (error.message === "Supplier not found") {
@@ -61,12 +64,14 @@ exports.setProductPrice = async (req, res) => {
     return res.status(400).json({ message: "supplierId, productId, and price are required." })
   }
   const result = await client.mutation(ref("supplierProducts:set"), { supplierId, productId, price })
+  await audit.log("set_supplier_price", req, { details: `Set price for supplier ${supplierId} product ${productId}: ₱${price}` })
   res.json(result)
 }
 
 exports.remove = async (req, res) => {
   try {
     await client.mutation(ref("suppliers:remove"), { id: req.params.id })
+    await audit.log("delete_supplier", req, { details: `Deleted supplier ${req.params.id}` })
     res.json({ message: "Supplier deleted." })
   } catch (error) {
     if (error.message === "Supplier not found") {

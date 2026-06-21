@@ -1,4 +1,5 @@
 const { client, ref } = require("../convex")
+const audit = require("../services/audit")
 
 exports.getAll = async (req, res) => {
   const { dateFrom, dateTo, page = 1, limit = 20 } = req.query
@@ -33,6 +34,7 @@ exports.create = async (req, res) => {
       createdBy: req.user?.id,
     })
     const sale = await client.query(ref("sales:getById"), { id })
+    await audit.log("create_sale", req, { details: `Sale #${sale.transactionId || id} - ₱${sale.total} (${items.length} items)`, itemId: id })
     res.status(201).json(sale)
   } catch (error) {
     if (error.message?.startsWith("Product") || error.message?.startsWith("Insufficient")) {
@@ -45,6 +47,7 @@ exports.create = async (req, res) => {
 exports.voidSale = async (req, res) => {
   try {
     const sale = await client.mutation(ref("sales:voidSale"), { id: req.params.id })
+    await audit.log("void_sale", req, { details: `Voided sale ${req.params.id}`, itemId: req.params.id })
     res.json(sale)
   } catch (error) {
     if (error.message === "Sale not found") {

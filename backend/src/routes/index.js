@@ -8,6 +8,7 @@ const userRoutes = require('./users')
 const inventoryRoutes = require('./inventory')
 const reportRoutes = require('./reports')
 const supplierRoutes = require('./suppliers')
+const auditRoutes = require('./audit')
 
 const router = Router()
 
@@ -19,5 +20,6 @@ router.use('/users', userRoutes)
 router.use('/inventory', inventoryRoutes)
 router.use('/reports', reportRoutes)
 router.use('/suppliers', supplierRoutes)
+router.use('/audit-logs', auditRoutes)
 
 module.exports = router
