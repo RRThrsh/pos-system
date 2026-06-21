@@ -123,3 +123,42 @@ export const configApi = {
   resetAuditLogs: () => request('/config/reset-audit-logs', { method: 'POST' }),
   backup: () => requestBlob('/config/backup', { method: 'POST' }),
 }
+
+export const permissionsApi = {
+  getAll: () => request('/permissions'),
+  getMyPermissions: () => request('/permissions/my'),
+  getByRole: (role) => request(`/permissions/${role}`),
+  set: (payload) => request('/permissions/set', { method: 'POST', body: JSON.stringify(payload) }),
+  seedDefaults: () => request('/permissions/seed', { method: 'POST' }),
+}
+
+export const purchaseOrdersApi = {
+  getAll: (params) => request(`/purchase-orders?${new URLSearchParams(params)}`),
+  getById: (id) => request(`/purchase-orders/${id}`),
+  create: (payload) => request('/purchase-orders', { method: 'POST', body: JSON.stringify(payload) }),
+  updateStatus: (id, status) => request(`/purchase-orders/${id}/status`, { method: 'PATCH', body: JSON.stringify({ status }) }),
+  remove: (id) => request(`/purchase-orders/${id}`, { method: 'DELETE' }),
+}
+
+export const expensesApi = {
+  getAll: (params) => request(`/expenses?${new URLSearchParams(params)}`),
+  create: (payload) => request('/expenses', { method: 'POST', body: JSON.stringify(payload) }),
+  remove: (id) => request(`/expenses/${id}`, { method: 'DELETE' }),
+}
+
+export const promoCodesApi = {
+  getAll: () => request('/promo-codes'),
+  getByCode: (code) => request(`/promo-codes/${code}`),
+  create: (payload) => request('/promo-codes', { method: 'POST', body: JSON.stringify(payload) }),
+  toggleActive: (id, isActive) => request(`/promo-codes/${id}/toggle`, { method: 'PATCH', body: JSON.stringify({ isActive }) }),
+  remove: (id) => request(`/promo-codes/${id}`, { method: 'DELETE' }),
+}
+
+export function downloadCSV(headers, rows, filename) {
+  const csv = [headers.join(','), ...rows.map((r) => headers.map((h) => { const v = r[h]; const s = String(v ?? ''); return s.includes(',') || s.includes('"') ? `"${s.replace(/"/g, '""')}"` : s }).join(','))].join('\n')
+  const blob = new Blob([csv], { type: 'text/csv' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url; a.download = filename; a.click()
+  URL.revokeObjectURL(url)
+}
