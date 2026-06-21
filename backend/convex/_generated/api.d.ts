@@ -10,6 +10,7 @@
 
 import type * as auditLogs from "../auditLogs.js";
 import type * as categories from "../categories.js";
+import type * as config from "../config.js";
 import type * as inventory from "../inventory.js";
 import type * as products from "../products.js";
 import type * as sales from "../sales.js";
@@ -26,6 +27,7 @@ import type {
 declare const fullApi: ApiFromModules<{
   auditLogs: typeof auditLogs;
   categories: typeof categories;
+  config: typeof config;
   inventory: typeof inventory;
   products: typeof products;
   sales: typeof sales;

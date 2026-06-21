@@ -82,6 +82,12 @@ export default defineSchema({
     createdAt: v.string(),
   }).index("by_createdAt", ["createdAt"]),
 
+  config: defineTable({
+    key: v.string(),
+    value: v.string(),
+    updatedAt: v.string(),
+  }).index("by_key", ["key"]),
+
   supplierProducts: defineTable({
     supplierId: v.id("suppliers"),
     productId: v.id("products"),

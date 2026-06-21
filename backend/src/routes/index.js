@@ -9,6 +9,7 @@ const inventoryRoutes = require('./inventory')
 const reportRoutes = require('./reports')
 const supplierRoutes = require('./suppliers')
 const auditRoutes = require('./audit')
+const configRoutes = require('./config')
 
 const router = Router()
 
@@ -21,5 +22,6 @@ router.use('/inventory', inventoryRoutes)
 router.use('/reports', reportRoutes)
 router.use('/suppliers', supplierRoutes)
 router.use('/audit-logs', auditRoutes)
+router.use('/config', configRoutes)
 
 module.exports = router

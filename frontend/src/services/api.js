@@ -12,6 +12,28 @@ async function request(endpoint, options = {}) {
   return data
 }
 
+async function requestBlob(endpoint, options = {}) {
+  const token = localStorage.getItem('token')
+  const headers = { ...options.headers }
+  if (token) headers['Authorization'] = `Bearer ${token}`
+
+  const res = await fetch(`${API_BASE}${endpoint}`, { ...options, headers })
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}))
+    throw { status: res.status, message: data.message || 'Request failed' }
+  }
+  const blob = await res.blob()
+  const disposition = res.headers.get('Content-Disposition')
+  const match = disposition && disposition.match(/filename="(.+)"/)
+  const filename = match ? match[1] : `pos-backup-${new Date().toISOString().slice(0, 10)}.xlsx`
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
 export const authApi = {
   login: (username, password) =>
     request('/auth/login', {
@@ -91,4 +113,13 @@ export const reportsApi = {
   paymentMethods: (params) => request(`/reports/payment-methods?${new URLSearchParams(params)}`),
   hourlySales: (params) => request(`/reports/hourly-sales?${new URLSearchParams(params)}`),
   activeUsers: () => request('/reports/active-users'),
+}
+
+export const configApi = {
+  getAll: () => request('/config'),
+  get: (key) => request(`/config/${key}`),
+  set: (key, value) => request('/config/set', { method: 'POST', body: JSON.stringify({ key, value }) }),
+  systemInfo: () => request('/config/system-info'),
+  resetAuditLogs: () => request('/config/reset-audit-logs', { method: 'POST' }),
+  backup: () => requestBlob('/config/backup', { method: 'POST' }),
 }
