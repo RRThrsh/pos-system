@@ -1,28 +1,26 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { auditLogsApi } from '../../services/api.js'
 import Spinner from '../../components/Spinner.jsx'
 import { useToast } from '../../context/ToastContext.jsx'
 
+const actionStyle = {
+  login: 'text-[#3fb950]', login_failed: 'text-[#f85149]', logout: 'text-[#8b949e]',
+  create_sale: 'text-[#58a6ff]', void_sale: 'text-[#d29922]',
+  create_user: 'text-[#bc8cff]', update_user: 'text-[#bc8cff]', delete_user: 'text-[#f85149]',
+  create_product: 'text-[#39d2c0]', update_product: 'text-[#39d2c0]', delete_product: 'text-[#f85149]',
+  create_category: 'text-[#56d4dd]', update_category: 'text-[#56d4dd]', delete_category: 'text-[#f85149]',
+  create_supplier: 'text-[#7ee787]', update_supplier: 'text-[#7ee787]', delete_supplier: 'text-[#f85149]',
+  adjust_inventory: 'text-[#d29922]', set_supplier_price: 'text-[#f0883e]',
+}
+
 const actionLabels = {
-  login: { label: 'Login', color: 'text-green-600 bg-green-100' },
-  login_failed: { label: 'Login Failed', color: 'text-red-600 bg-red-100' },
-  logout: { label: 'Logout', color: 'text-gray-600 bg-gray-100' },
-  create_sale: { label: 'Sale', color: 'text-blue-600 bg-blue-100' },
-  void_sale: { label: 'Void', color: 'text-orange-600 bg-orange-100' },
-  create_user: { label: 'Created User', color: 'text-indigo-600 bg-indigo-100' },
-  update_user: { label: 'Updated User', color: 'text-indigo-600 bg-indigo-100' },
-  delete_user: { label: 'Deleted User', color: 'text-red-600 bg-red-100' },
-  create_product: { label: 'Created Product', color: 'text-purple-600 bg-purple-100' },
-  update_product: { label: 'Updated Product', color: 'text-purple-600 bg-purple-100' },
-  delete_product: { label: 'Deleted Product', color: 'text-red-600 bg-red-100' },
-  create_category: { label: 'Created Category', color: 'text-teal-600 bg-teal-100' },
-  update_category: { label: 'Updated Category', color: 'text-teal-600 bg-teal-100' },
-  delete_category: { label: 'Deleted Category', color: 'text-red-600 bg-red-100' },
-  create_supplier: { label: 'Created Supplier', color: 'text-cyan-600 bg-cyan-100' },
-  update_supplier: { label: 'Updated Supplier', color: 'text-cyan-600 bg-cyan-100' },
-  delete_supplier: { label: 'Deleted Supplier', color: 'text-red-600 bg-red-100' },
-  adjust_inventory: { label: 'Inventory Adj.', color: 'text-yellow-600 bg-yellow-100' },
-  set_supplier_price: { label: 'Supplier Price', color: 'text-pink-600 bg-pink-100' },
+  login: 'LOGIN', login_failed: 'LOGIN_FAIL', logout: 'LOGOUT',
+  create_sale: 'SALE', void_sale: 'VOID',
+  create_user: 'USER+', update_user: 'USER~', delete_user: 'USER-',
+  create_product: 'PROD+', update_product: 'PROD~', delete_product: 'PROD-',
+  create_category: 'CAT+', update_category: 'CAT~', delete_category: 'CAT-',
+  create_supplier: 'SUPP+', update_supplier: 'SUPP~', delete_supplier: 'SUPP-',
+  adjust_inventory: 'INV', set_supplier_price: 'PRICE',
 }
 
 function AuditLogs() {
@@ -31,10 +29,11 @@ function AuditLogs() {
   const [loading, setLoading] = useState(true)
   const [actionFilter, setActionFilter] = useState('')
   const [total, setTotal] = useState(0)
+  const scrollRef = useRef(null)
 
   const load = (action) => {
     setLoading(true)
-    const params = { limit: '100' }
+    const params = { limit: '500' }
     if (action) params.action = action
     auditLogsApi.getAll(params)
       .then((res) => { setLogs(res.data || []); setTotal(res.total || 0) })
@@ -44,57 +43,49 @@ function AuditLogs() {
 
   useEffect(() => { load(actionFilter) }, [actionFilter])
 
+  useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight
+    }
+  }, [logs])
+
   const allActions = Object.keys(actionLabels)
 
   return (
-    <div>
-      <h1 className="text-2xl font-bold text-gray-800 mb-6">Audit Logs</h1>
-
-      <div className="mb-4 flex items-center gap-3 flex-wrap">
+    <div className="flex flex-col h-[calc(100vh-8rem)]">
+      <div className="flex items-center justify-between mb-4 shrink-0">
+        <h1 className="text-2xl font-bold text-gray-800">Audit Logs</h1>
         <select value={actionFilter} onChange={(e) => setActionFilter(e.target.value)}
-          className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20">
-          <option value="">All Actions ({total})</option>
+          className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 bg-white">
+          <option value="">All ({total})</option>
           {allActions.map((key) => (
-            <option key={key} value={key}>{actionLabels[key].label}</option>
+            <option key={key} value={key}>{actionLabels[key]} ({key})</option>
           ))}
         </select>
       </div>
 
       {loading ? <Spinner /> : (
-        <div className="bg-white rounded-lg shadow overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-gray-50 text-gray-600">
-              <tr>
-                <th className="text-left px-4 py-3 font-medium">Timestamp</th>
-                <th className="text-left px-4 py-3 font-medium">User</th>
-                <th className="text-left px-4 py-3 font-medium">Action</th>
-                <th className="text-left px-4 py-3 font-medium">Details</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {logs.length === 0 ? (
-                <tr><td colSpan={4} className="text-center py-8 text-gray-400">No audit logs yet.</td></tr>
-              ) : (
-                logs.map((log) => {
-                  const act = actionLabels[log.action] || { label: log.action, color: 'text-gray-600 bg-gray-100' }
-                  return (
-                    <tr key={log._id} className="hover:bg-gray-50">
-                      <td className="px-4 py-3 text-gray-500 whitespace-nowrap text-xs">
-                        {new Date(log.createdAt).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' })}
-                      </td>
-                      <td className="px-4 py-3 text-gray-900 font-medium">{log.username}</td>
-                      <td className="px-4 py-3">
-                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${act.color}`}>
-                          {act.label}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-gray-600 max-w-md truncate">{log.details || '—'}</td>
-                    </tr>
-                  )
-                })
-              )}
-            </tbody>
-          </table>
+        <div ref={scrollRef} className="flex-1 bg-[#0d1117] rounded-lg border border-[#30363d] overflow-y-auto font-mono text-xs p-4 leading-5">
+          {logs.length === 0 ? (
+            <p className="text-[#8b949e] text-center pt-8">No audit logs yet.</p>
+          ) : (
+            logs.map((log) => {
+              const st = actionStyle[log.action] || 'text-[#8b949e]'
+              const label = actionLabels[log.action] || log.action.toUpperCase().slice(0, 8)
+              const time = new Date(log.createdAt).toLocaleDateString('en-US', {
+                year: 'numeric', month: '2-digit', day: '2-digit',
+                hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false,
+              })
+              return (
+                <div key={log._id} className="flex gap-3 hover:bg-[#161b22] px-1 rounded">
+                  <span className="text-[#484f58] shrink-0 w-[165px]">{time}</span>
+                  <span className="text-[#8b949e] shrink-0 w-[90px] truncate" title={log.username}>{log.username}</span>
+                  <span className={`${st} shrink-0 w-[70px] font-bold`}>[{label}]</span>
+                  <span className="text-[#c9d1d9] truncate">{log.details || '—'}</span>
+                </div>
+              )
+            })
+          )}
         </div>
       )}
     </div>

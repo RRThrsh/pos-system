@@ -18,7 +18,7 @@ export const list = query({
     if (dateFrom) logs = logs.filter((l) => l.createdAt >= dateFrom)
     if (dateTo) logs = logs.filter((l) => l.createdAt <= dateTo)
 
-    logs.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    logs.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
 
     return {
       data: logs.slice(offset, offset + limit),
