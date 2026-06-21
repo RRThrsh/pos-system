@@ -43,11 +43,14 @@ export const create = mutation({
     customerId: v.optional(v.id("customers")),
     paymentMethod: v.optional(v.string()),
     amountPaid: v.optional(v.number()),
+    discount: v.optional(v.number()),
+    discountType: v.optional(v.string()),
+    orderType: v.optional(v.string()),
     createdBy: v.optional(v.id("users")),
   },
-  handler: async (ctx, { items, customerId, paymentMethod, amountPaid, createdBy }) => {
+  handler: async (ctx, { items, customerId, paymentMethod, amountPaid, discount, discountType, orderType, createdBy }) => {
     const saleItems = []
-    let total = 0
+    let subtotal = 0
 
     for (const item of items) {
       const product = await ctx.db.get(item.productId)
@@ -55,7 +58,7 @@ export const create = mutation({
       if (product.stock < item.qty) throw new Error(`Insufficient stock for ${product.name}`)
 
       const lineTotal = product.price * item.qty
-      total += lineTotal
+      subtotal += lineTotal
       saleItems.push({
         productId: item.productId,
         productName: product.name,
@@ -67,11 +70,17 @@ export const create = mutation({
       await ctx.db.patch(item.productId, { stock: product.stock - item.qty, updatedAt: new Date().toISOString() })
     }
 
+    const disc = discount ?? 0
+    const discAmt = discountType === "percentage" ? subtotal * (disc / 100) : disc
+    const total = Math.max(0, subtotal - discAmt)
     const change = amountPaid ? amountPaid - total : 0
 
     return await ctx.db.insert("sales", {
       items: saleItems,
       total,
+      discount: discAmt,
+      discountType: discountType ?? "fixed",
+      orderType: orderType ?? "dine-in",
       customerId,
       paymentMethod: paymentMethod ?? "cash",
       amountPaid: amountPaid ?? total,

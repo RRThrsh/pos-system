@@ -46,6 +46,9 @@ export default defineSchema({
       total: v.number(),
     })),
     total: v.number(),
+    discount: v.number(),
+    discountType: v.optional(v.string()),
+    orderType: v.string(),
     customerId: v.optional(v.id("customers")),
     paymentMethod: v.string(),
     amountPaid: v.number(),
@@ -55,6 +58,15 @@ export default defineSchema({
     createdAt: v.string(),
     voidedAt: v.optional(v.string()),
   }).index("by_createdAt", ["createdAt"]),
+
+  suppliers: defineTable({
+    name: v.string(),
+    contact: v.string(),
+    phone: v.string(),
+    email: v.string(),
+    address: v.string(),
+    createdAt: v.string(),
+  }),
 
   inventoryMovements: defineTable({
     productId: v.id("products"),

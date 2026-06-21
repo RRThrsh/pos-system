@@ -5,7 +5,21 @@ import Login from './pages/auth/Login.jsx'
 import Layout from './components/Layout.jsx'
 import ProtectedRoute from './components/ProtectedRoute.jsx'
 import Dashboard from './pages/dashboard/Dashboard.jsx'
-import Users from './pages/users/Users.jsx'
+import AuditLogs from './pages/dashboard/AuditLogs.jsx'
+import Config from './pages/dashboard/Config.jsx'
+import Permissions from './pages/dashboard/Permissions.jsx'
+import Monitoring from './pages/dashboard/Monitoring.jsx'
+import Analytics from './pages/dashboard/Analytics.jsx'
+import Products from './pages/dashboard/Products.jsx'
+import Categories from './pages/dashboard/Categories.jsx'
+import Customers from './pages/dashboard/Customers.jsx'
+import Pos from './pages/dashboard/Pos.jsx'
+import SalesHistory from './pages/dashboard/SalesHistory.jsx'
+import Inventory from './pages/dashboard/Inventory.jsx'
+import Reports from './pages/dashboard/Reports.jsx'
+import Users from './pages/dashboard/Users.jsx'
+import Suppliers from './pages/dashboard/Suppliers.jsx'
+import Returns from './pages/dashboard/Returns.jsx'
 
 function App() {
   return (
@@ -22,14 +36,21 @@ function App() {
               }
             >
               <Route path="/dashboard" element={<Dashboard />} />
-              <Route
-                path="/users"
-                element={
-                  <ProtectedRoute roles={['superadmin']}>
-                    <Users />
-                  </ProtectedRoute>
-                }
-              />
+              <Route path="/dashboard/pos" element={<Pos />} />
+              <Route path="/dashboard/products" element={<Products />} />
+              <Route path="/dashboard/categories" element={<Categories />} />
+              <Route path="/dashboard/customers" element={<Customers />} />
+              <Route path="/dashboard/sales" element={<SalesHistory />} />
+              <Route path="/dashboard/inventory" element={<Inventory />} />
+              <Route path="/dashboard/reports" element={<Reports />} />
+              <Route path="/dashboard/users" element={<Users />} />
+              <Route path="/dashboard/suppliers" element={<Suppliers />} />
+              <Route path="/dashboard/returns" element={<Returns />} />
+              <Route path="/dashboard/audit-logs" element={<AuditLogs />} />
+              <Route path="/dashboard/config" element={<Config />} />
+              <Route path="/dashboard/permissions" element={<Permissions />} />
+              <Route path="/dashboard/monitoring" element={<Monitoring />} />
+              <Route path="/dashboard/analytics" element={<Analytics />} />
             </Route>
             <Route path="*" element={<Navigate to="/login" replace />} />
           </Routes>

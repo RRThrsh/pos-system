@@ -38,6 +38,49 @@ export const usersApi = {
   remove: (id) => request(`/users/${id}`, { method: 'DELETE' }),
 }
 
+export const productsApi = {
+  getAll: (params) => request(`/products?${new URLSearchParams(params)}`),
+  getById: (id) => request(`/products/${id}`),
+  create: (payload) => request('/products', { method: 'POST', body: JSON.stringify(payload) }),
+  update: (id, payload) => request(`/products/${id}`, { method: 'PUT', body: JSON.stringify(payload) }),
+  remove: (id) => request(`/products/${id}`, { method: 'DELETE' }),
+}
+
+export const categoriesApi = {
+  getAll: () => request('/categories'),
+  create: (payload) => request('/categories', { method: 'POST', body: JSON.stringify(payload) }),
+  update: (id, payload) => request(`/categories/${id}`, { method: 'PUT', body: JSON.stringify(payload) }),
+  remove: (id) => request(`/categories/${id}`, { method: 'DELETE' }),
+}
+
+export const customersApi = {
+  getAll: (params) => request(`/customers?${new URLSearchParams(params)}`),
+  getById: (id) => request(`/customers/${id}`),
+  create: (payload) => request('/customers', { method: 'POST', body: JSON.stringify(payload) }),
+  update: (id, payload) => request(`/customers/${id}`, { method: 'PUT', body: JSON.stringify(payload) }),
+  remove: (id) => request(`/customers/${id}`, { method: 'DELETE' }),
+}
+
+export const salesApi = {
+  getAll: (params) => request(`/sales?${new URLSearchParams(params)}`),
+  getById: (id) => request(`/sales/${id}`),
+  create: (payload) => request('/sales', { method: 'POST', body: JSON.stringify(payload) }),
+  voidSale: (id) => request(`/sales/${id}/void`, { method: 'POST' }),
+}
+
+export const inventoryApi = {
+  getMovements: (params) => request(`/inventory?${new URLSearchParams(params)}`),
+  adjust: (payload) => request('/inventory/adjust', { method: 'POST', body: JSON.stringify(payload) }),
+}
+
+export const suppliersApi = {
+  getAll: (params) => request(`/suppliers?${new URLSearchParams(params)}`),
+  getById: (id) => request(`/suppliers/${id}`),
+  create: (payload) => request('/suppliers', { method: 'POST', body: JSON.stringify(payload) }),
+  update: (id, payload) => request(`/suppliers/${id}`, { method: 'PUT', body: JSON.stringify(payload) }),
+  remove: (id) => request(`/suppliers/${id}`, { method: 'DELETE' }),
+}
+
 export const reportsApi = {
   summary: () => request('/reports/summary'),
   sales: (params) => request(`/reports/sales?${new URLSearchParams(params)}`),
