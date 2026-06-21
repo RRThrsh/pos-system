@@ -8,5 +8,7 @@ router.get('/sales', authenticate, authorize('admin', 'superadmin'), reportContr
 router.get('/inventory', authenticate, authorize('admin', 'superadmin'), reportController.inventoryReport)
 router.get('/profits', authenticate, authorize('admin', 'superadmin'), reportController.profitsReport)
 router.get('/summary', authenticate, authorize('admin', 'superadmin'), reportController.summary)
+router.get('/best-sellers', authenticate, authorize('admin', 'superadmin'), reportController.bestSellers)
+router.get('/daily-summaries', authenticate, authorize('admin', 'superadmin'), reportController.dailySummaries)
 
 module.exports = router

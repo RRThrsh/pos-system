@@ -78,4 +78,6 @@ export const reportsApi = {
   sales: (params) => request(`/reports/sales?${new URLSearchParams(params)}`),
   inventory: () => request('/reports/inventory'),
   profits: (params) => request(`/reports/profits?${new URLSearchParams(params)}`),
+  bestSellers: (params) => request(`/reports/best-sellers?${new URLSearchParams(params)}`),
+  dailySummaries: (params) => request(`/reports/daily-summaries?${new URLSearchParams(params)}`),
 }
