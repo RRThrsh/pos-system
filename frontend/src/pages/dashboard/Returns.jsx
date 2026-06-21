@@ -4,9 +4,11 @@ import Modal from '../../components/Modal.jsx'
 import Spinner from '../../components/Spinner.jsx'
 import Pagination, { PAGE_SIZE } from '../../components/Pagination.jsx'
 import { useToast } from '../../context/ToastContext.jsx'
+import { usePermission } from '../../hooks/usePermission.js'
 
 function Returns() {
   const { addToast } = useToast()
+  const { canExecute } = usePermission('Sales')
   const [items, setItems] = useState([])
   const [loading, setLoading] = useState(true)
   const [viewItem, setViewItem] = useState(null)
@@ -91,7 +93,7 @@ function Returns() {
                   <td className="px-4 py-3 text-right font-medium">&#8369;{Number(sale.total || 0).toLocaleString()}</td>
                   <td className="px-4 py-3 capitalize text-gray-600">{sale.paymentMethod || sale.payment}</td>
                   <td className="px-4 py-3 text-center">
-                    <button onClick={() => openReturn(sale)} className="text-orange-600 hover:text-orange-800 font-medium">Return</button>
+                    {canExecute && <button onClick={() => openReturn(sale)} className="text-orange-600 hover:text-orange-800 font-medium">Return</button>}
                   </td>
                 </tr>
               ))}

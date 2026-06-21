@@ -4,9 +4,11 @@ import Modal from '../../components/Modal.jsx'
 import Spinner from '../../components/Spinner.jsx'
 import Pagination, { PAGE_SIZE } from '../../components/Pagination.jsx'
 import { useToast } from '../../context/ToastContext.jsx'
+import { usePermission } from '../../hooks/usePermission.js'
 
 function Categories() {
   const { addToast } = useToast()
+  const { canWrite, canExecute } = usePermission('Categories')
   const [items, setItems] = useState([])
   const [loading, setLoading] = useState(true)
   const [modalOpen, setModalOpen] = useState(false)
@@ -59,7 +61,7 @@ function Categories() {
   return (
     <div>
       <div className="flex items-center justify-end mb-6">
-        <button onClick={openCreate} className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-indigo-500 transition-colors">+ Add Category</button>
+        {canWrite && <button onClick={openCreate} className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-indigo-500 transition-colors">+ Add Category</button>}
       </div>
 
       {loading ? <Spinner /> : (
@@ -76,8 +78,8 @@ function Categories() {
                 <tr key={item._id || item.id} className="hover:bg-gray-50">
                   <td className="px-4 py-3 font-medium text-gray-900">{item.name}</td>
                   <td className="px-4 py-3 text-center">
-                    <button onClick={() => openEdit(item)} className="text-indigo-600 hover:text-indigo-800 mr-3">Edit</button>
-                    <button onClick={() => handleDelete(item._id || item.id)} className="text-red-600 hover:text-red-800">Delete</button>
+                    {canWrite && <button onClick={() => openEdit(item)} className="text-indigo-600 hover:text-indigo-800 mr-3">Edit</button>}
+                    {canExecute && <button onClick={() => handleDelete(item._id || item.id)} className="text-red-600 hover:text-red-800">Delete</button>}
                   </td>
                 </tr>
               ))}
