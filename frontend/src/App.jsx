@@ -9,6 +9,7 @@ import AuditLogs from './pages/dashboard/AuditLogs.jsx'
 import Config from './pages/dashboard/Config.jsx'
 import Permissions from './pages/dashboard/Permissions.jsx'
 import Monitoring from './pages/dashboard/Monitoring.jsx'
+import Snapshots from './pages/dashboard/Snapshots.jsx'
 import Analytics from './pages/dashboard/Analytics.jsx'
 import Products from './pages/dashboard/Products.jsx'
 import Categories from './pages/dashboard/Categories.jsx'
@@ -48,6 +49,7 @@ function App() {
               <Route path="/dashboard/config" element={<Config />} />
               <Route path="/dashboard/permissions" element={<Permissions />} />
               <Route path="/dashboard/monitoring" element={<Monitoring />} />
+              <Route path="/dashboard/snapshots" element={<Snapshots />} />
               <Route path="/dashboard/analytics" element={<Analytics />} />
             </Route>
             <Route path="*" element={<Navigate to="/login" replace />} />
