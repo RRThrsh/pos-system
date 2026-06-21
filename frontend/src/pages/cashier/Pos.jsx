@@ -178,7 +178,7 @@ function Pos() {
     <div className="flex gap-6 h-[calc(100vh-8rem)]">
       <div className="flex-1 flex flex-col">
         <div className="flex items-center justify-between mb-4">
-          <h1 className="text-2xl font-bold text-gray-800">Point of Sale</h1>
+
           <div className="flex items-center gap-3">
             <select value={orderType} onChange={(e) => setOrderType(e.target.value)} className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20">
               <option value="dine-in">Dine In</option>

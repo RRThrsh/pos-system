@@ -47,7 +47,6 @@ function AuditLogs() {
 
   return (
     <div className="flex flex-col h-[calc(100vh-8rem)]">
-      <h1 className="text-2xl font-bold text-gray-800 mb-4 shrink-0">Audit Logs</h1>
 
       {loading ? <Spinner /> : (
         <div ref={scrollRef} className="flex-1 bg-[#0d1117] rounded-lg border border-[#30363d] overflow-y-auto font-mono text-xs p-4 leading-5">

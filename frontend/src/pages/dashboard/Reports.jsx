@@ -43,7 +43,6 @@ function Reports() {
 
   return (
     <div>
-      <h1 className="text-2xl font-bold text-gray-800 mb-6">Reports</h1>
 
       <div className="flex justify-between items-center mb-6">
         <div className="flex gap-1 bg-gray-100 rounded-lg p-1 w-fit">
