@@ -1,38 +1,52 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { authApi } from '../services/api.js'
 
 const AuthContext = createContext(null)
+
+function getStorage() {
+  return localStorage.getItem('remember') === 'true' ? localStorage : sessionStorage
+}
 
 function AuthProvider({ children }) {
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    const token = localStorage.getItem('token')
-    const stored = localStorage.getItem('user')
+    const storage = localStorage.getItem('remember') === 'true' ? localStorage : sessionStorage
+    const token = storage.getItem('token')
+    const stored = storage.getItem('user')
     if (token && stored) {
       try {
         setUser(JSON.parse(stored))
       } catch {
-        localStorage.removeItem('token')
-        localStorage.removeItem('user')
+        storage.removeItem('token')
+        storage.removeItem('user')
+        localStorage.removeItem('remember')
       }
     }
     setLoading(false)
   }, [])
 
-  const login = useCallback(async (username, password) => {
+  const login = useCallback(async (username, password, remember = false) => {
     const data = await authApi.login(username, password)
-    localStorage.setItem('token', data.token)
-    localStorage.setItem('user', JSON.stringify(data.user))
+    const storage = remember ? localStorage : sessionStorage
+    storage.setItem('token', data.token)
+    storage.setItem('user', JSON.stringify(data.user))
+    if (remember) {
+      localStorage.setItem('remember', 'true')
+    } else {
+      localStorage.removeItem('remember')
+    }
     setUser(data.user)
     return data.user
   }, [])
 
   const logout = useCallback(() => {
+    localStorage.removeItem('remember')
     localStorage.removeItem('token')
     localStorage.removeItem('user')
+    sessionStorage.removeItem('token')
+    sessionStorage.removeItem('user')
     setUser(null)
   }, [])
 
@@ -40,7 +54,8 @@ function AuthProvider({ children }) {
     try {
       const data = await authApi.me()
       setUser(data.user)
-      localStorage.setItem('user', JSON.stringify(data.user))
+      const storage = getStorage()
+      storage.setItem('user', JSON.stringify(data.user))
     } catch {
       logout()
     }

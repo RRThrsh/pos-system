@@ -24,6 +24,11 @@ export const authApi = {
       body: JSON.stringify(payload),
     }),
   me: () => request('/auth/me'),
+  forgotPassword: (email) =>
+    request('/auth/forgot-password', {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+    }),
 }
 
 export const usersApi = {
