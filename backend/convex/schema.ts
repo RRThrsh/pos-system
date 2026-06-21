@@ -72,4 +72,14 @@ export default defineSchema({
     reason: v.string(),
     createdAt: v.string(),
   }).index("by_productId", ["productId"]),
+
+  supplierProducts: defineTable({
+    supplierId: v.id("suppliers"),
+    productId: v.id("products"),
+    price: v.number(),
+    previousPrice: v.optional(v.number()),
+    previousPriceDate: v.optional(v.string()),
+    createdAt: v.string(),
+    updatedAt: v.string(),
+  }).index("by_supplier", ["supplierId"]).index("by_product", ["productId"]),
 })

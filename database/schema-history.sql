@@ -106,6 +106,22 @@ CREATE TABLE inventory_movements (
 CREATE INDEX idx_inventory_productId ON inventory_movements(productId);
 
 -- =============================================
+-- Supplier Products (price tracking)
+-- =============================================
+CREATE TABLE supplier_products (
+    _id TEXT PRIMARY KEY,
+    supplierId TEXT NOT NULL REFERENCES suppliers(_id),
+    productId TEXT NOT NULL REFERENCES products(_id),
+    price REAL NOT NULL,
+    previousPrice REAL,
+    previousPriceDate TEXT,
+    createdAt TEXT NOT NULL,
+    updatedAt TEXT NOT NULL
+);
+CREATE INDEX idx_sp_supplier ON supplier_products(supplierId);
+CREATE INDEX idx_sp_product ON supplier_products(productId);
+
+-- =============================================
 -- Migration History
 -- =============================================
 -- v1  - Initial schema: users, categories, products, customers, sales, inventory_movements
@@ -113,3 +129,4 @@ CREATE INDEX idx_inventory_productId ON inventory_movements(productId);
 -- v3  - Added discount, discountType, orderType columns to sales
 -- v4  - Added unitValue, unit columns to products
 -- v5  - Removed customers table
+-- v6  - Added supplier_products table with price history tracking

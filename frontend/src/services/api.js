@@ -71,6 +71,9 @@ export const suppliersApi = {
   create: (payload) => request('/suppliers', { method: 'POST', body: JSON.stringify(payload) }),
   update: (id, payload) => request(`/suppliers/${id}`, { method: 'PUT', body: JSON.stringify(payload) }),
   remove: (id) => request(`/suppliers/${id}`, { method: 'DELETE' }),
+  productsBySupplier: (id) => request(`/suppliers/${id}/products`),
+  compareByProduct: (params) => request(`/suppliers/compare/product?${new URLSearchParams(params)}`),
+  setProductPrice: (payload) => request('/suppliers/products/price', { method: 'POST', body: JSON.stringify(payload) }),
 }
 
 export const reportsApi = {

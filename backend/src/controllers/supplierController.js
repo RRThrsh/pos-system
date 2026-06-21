@@ -43,6 +43,27 @@ exports.update = async (req, res) => {
   }
 }
 
+exports.productsBySupplier = async (req, res) => {
+  const result = await client.query(ref("supplierProducts:listBySupplier"), { supplierId: req.params.id })
+  res.json(result)
+}
+
+exports.compareByProduct = async (req, res) => {
+  const { productId } = req.query
+  if (!productId) return res.status(400).json({ message: "productId is required." })
+  const result = await client.query(ref("supplierProducts:listByProduct"), { productId })
+  res.json(result)
+}
+
+exports.setProductPrice = async (req, res) => {
+  const { supplierId, productId, price } = req.body
+  if (!supplierId || !productId || price === undefined) {
+    return res.status(400).json({ message: "supplierId, productId, and price are required." })
+  }
+  const result = await client.mutation(ref("supplierProducts:set"), { supplierId, productId, price })
+  res.json(result)
+}
+
 exports.remove = async (req, res) => {
   try {
     await client.mutation(ref("suppliers:remove"), { id: req.params.id })
