@@ -1,0 +1,148 @@
+-- POS System Database Schema (Convex)
+-- Last updated: 2026-06-21
+-- Migration: Added suppliers, discount/orderType to sales
+
+-- =============================================
+-- Users
+-- =============================================
+CREATE TABLE users (
+    _id TEXT PRIMARY KEY,
+    firstName TEXT,
+    lastName TEXT,
+    username TEXT NOT NULL,
+    password TEXT NOT NULL,
+    role TEXT NOT NULL CHECK (role IN ('superadmin', 'admin', 'cashier')),
+    isActive INTEGER NOT NULL DEFAULT 1,
+    createdAt TEXT NOT NULL
+);
+CREATE UNIQUE INDEX idx_users_username ON users(username);
+
+-- =============================================
+-- Categories
+-- =============================================
+CREATE TABLE categories (
+    _id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    createdAt TEXT NOT NULL
+);
+CREATE UNIQUE INDEX idx_categories_name ON categories(name);
+
+-- =============================================
+-- Products
+-- =============================================
+CREATE TABLE products (
+    _id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    sku TEXT NOT NULL,
+    price REAL NOT NULL,
+    cost REAL NOT NULL DEFAULT 0,
+    category TEXT NOT NULL DEFAULT 'Uncategorized',
+    stock INTEGER NOT NULL DEFAULT 0,
+    barcode TEXT NOT NULL DEFAULT '',
+    unitValue REAL,
+    unit TEXT,
+    createdAt TEXT NOT NULL,
+    updatedAt TEXT NOT NULL
+);
+CREATE UNIQUE INDEX idx_products_sku ON products(sku);
+
+-- =============================================
+-- Sales
+-- =============================================
+CREATE TABLE sales (
+    _id TEXT PRIMARY KEY,
+    total REAL NOT NULL,
+    discount REAL NOT NULL DEFAULT 0,
+    discountType TEXT DEFAULT 'fixed',
+    orderType TEXT NOT NULL DEFAULT 'dine-in',
+    transactionId TEXT,
+    paymentMethod TEXT NOT NULL DEFAULT 'cash',
+    amountPaid REAL NOT NULL,
+    change REAL NOT NULL DEFAULT 0,
+    status TEXT NOT NULL DEFAULT 'completed',
+    createdBy TEXT REFERENCES users(_id),
+    createdAt TEXT NOT NULL,
+    voidedAt TEXT
+);
+CREATE INDEX idx_sales_createdAt ON sales(createdAt);
+
+CREATE TABLE sale_items (
+    _id TEXT PRIMARY KEY,
+    saleId TEXT NOT NULL REFERENCES sales(_id) ON DELETE CASCADE,
+    productId TEXT NOT NULL REFERENCES products(_id),
+    productName TEXT NOT NULL,
+    price REAL NOT NULL,
+    qty INTEGER NOT NULL,
+    total REAL NOT NULL
+);
+
+-- =============================================
+-- Suppliers
+-- =============================================
+CREATE TABLE suppliers (
+    _id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    contact TEXT NOT NULL DEFAULT '',
+    phone TEXT NOT NULL DEFAULT '',
+    email TEXT NOT NULL DEFAULT '',
+    address TEXT NOT NULL DEFAULT '',
+    createdAt TEXT NOT NULL
+);
+
+-- =============================================
+-- Inventory Movements
+-- =============================================
+CREATE TABLE inventory_movements (
+    _id TEXT PRIMARY KEY,
+    productId TEXT NOT NULL REFERENCES products(_id),
+    productName TEXT NOT NULL,
+    type TEXT NOT NULL CHECK (type IN ('in', 'out')),
+    quantity INTEGER NOT NULL,
+    stockBefore INTEGER NOT NULL,
+    stockAfter INTEGER NOT NULL,
+    reason TEXT NOT NULL DEFAULT '',
+    createdAt TEXT NOT NULL
+);
+CREATE INDEX idx_inventory_productId ON inventory_movements(productId);
+
+-- =============================================
+-- Supplier Products (price tracking)
+-- =============================================
+CREATE TABLE supplier_products (
+    _id TEXT PRIMARY KEY,
+    supplierId TEXT NOT NULL REFERENCES suppliers(_id),
+    productId TEXT NOT NULL REFERENCES products(_id),
+    price REAL NOT NULL,
+    previousPrice REAL,
+    previousPriceDate TEXT,
+    createdAt TEXT NOT NULL,
+    updatedAt TEXT NOT NULL
+);
+CREATE INDEX idx_sp_supplier ON supplier_products(supplierId);
+CREATE INDEX idx_sp_product ON supplier_products(productId);
+
+-- =============================================
+-- Audit Logs
+-- =============================================
+CREATE TABLE audit_logs (
+    _id TEXT PRIMARY KEY,
+    userId TEXT REFERENCES users(_id),
+    username TEXT NOT NULL,
+    action TEXT NOT NULL,
+    details TEXT DEFAULT '',
+    ip TEXT DEFAULT '',
+    createdAt TEXT NOT NULL
+);
+CREATE INDEX idx_audit_createdAt ON audit_logs(createdAt);
+
+-- =============================================
+-- Migration History
+-- =============================================
+-- v1  - Initial schema: users, categories, products, customers, sales, inventory_movements
+-- v2  - Added suppliers table
+-- v3  - Added discount, discountType, orderType columns to sales
+-- v4  - Added unitValue, unit columns to products
+-- v5  - Removed customers table
+-- v6  - Added supplier_products table with price history tracking
+-- v7  - Replaced customerId with transactionId on sales table
+-- v8  - Added audit_logs table for user activity tracking
