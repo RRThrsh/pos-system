@@ -1,13 +1,7 @@
 import { createContext, useContext, useState, useCallback } from 'react'
+import Toast from '../components/Toast.jsx'
 
 const ToastContext = createContext(null)
-
-const toastStyles = {
-  success: 'bg-green-500',
-  error: 'bg-red-500',
-  info: 'bg-blue-500',
-  warning: 'bg-yellow-500 text-black',
-}
 
 function ToastProvider({ children }) {
   const [toasts, setToasts] = useState([])
@@ -29,20 +23,7 @@ function ToastProvider({ children }) {
       {children}
       <div className="fixed top-4 right-4 z-[100] flex flex-col gap-2">
         {toasts.map((toast) => (
-          <div
-            key={toast.id}
-            className={`${toastStyles[toast.type] || toastStyles.info}
-              text-white px-4 py-3 rounded-lg shadow-lg flex items-center justify-between
-              min-w-[280px] max-w-sm animate-slide-in`}
-          >
-            <span>{toast.message}</span>
-            <button
-              onClick={() => removeToast(toast.id)}
-              className="ml-3 text-white/80 hover:text-white text-lg leading-none"
-            >
-              &times;
-            </button>
-          </div>
+          <Toast key={toast.id} message={toast.message} type={toast.type} onClose={() => removeToast(toast.id)} />
         ))}
       </div>
     </ToastContext.Provider>

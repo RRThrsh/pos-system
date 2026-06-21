@@ -34,7 +34,7 @@ export const authApi = {
 export const usersApi = {
   getAll: () => request('/users'),
   create: (payload) => request('/users', { method: 'POST', body: JSON.stringify(payload) }),
-  update: (id, payload) => request(`/users/${id}`, { method: 'PUT', body: JSON.stringify(payload) }),
+  update: (id, payload) => request(`/users/${id}`, { method: 'PATCH', body: JSON.stringify(payload) }),
   remove: (id) => request(`/users/${id}`, { method: 'DELETE' }),
 }
 
