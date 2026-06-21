@@ -73,6 +73,9 @@ function Inventory() {
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
+        <input type="text" placeholder="Search products..." value={search}
+          onChange={(e) => { setSearch(e.target.value); setStockPage(1) }}
+          className="w-full max-w-xs rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20" />
         <button onClick={() => setModalOpen(true)} className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-indigo-500 transition-colors">+ Adjust Stock</button>
       </div>
 
@@ -95,15 +98,6 @@ function Inventory() {
         <>
           {tab === 'stock' && (
             <div className="bg-white rounded-lg shadow overflow-x-auto">
-              <div className="p-4 border-b border-gray-100">
-                <input
-                  type="text"
-                  placeholder="Search products..."
-                  value={search}
-                  onChange={(e) => { setSearch(e.target.value); setStockPage(1) }}
-                  className="w-full max-w-xs rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
-                />
-              </div>
               <table className="w-full text-sm">
                 <thead className="bg-gray-50 text-gray-600">
                   <tr>

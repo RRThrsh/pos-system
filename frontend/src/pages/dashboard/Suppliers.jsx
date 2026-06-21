@@ -278,16 +278,13 @@ function Suppliers() {
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
+        <input type="text" placeholder="Search suppliers..." value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="w-full max-w-xs rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20" />
         <div className="flex gap-2">
           <button onClick={() => setCompareModal(true)} className="border border-indigo-600 text-indigo-600 px-4 py-2 rounded-lg text-sm font-semibold hover:bg-indigo-50 transition-colors">Compare Prices</button>
           <button onClick={openCreate} className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-indigo-500 transition-colors">+ Add Supplier</button>
         </div>
-      </div>
-
-      <div className="mb-4">
-        <input type="text" placeholder="Search suppliers..." value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="w-full max-w-xs rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20" />
       </div>
 
       {loading ? <Spinner /> : (
