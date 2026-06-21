@@ -1,12 +1,14 @@
 import { useState, useEffect } from 'react'
-import { inventoryApi, productsApi } from '../../services/api.js'
+import { inventoryApi, productsApi, downloadCSV } from '../../services/api.js'
 import Modal from '../../components/Modal.jsx'
 import Spinner from '../../components/Spinner.jsx'
 import Pagination, { PAGE_SIZE } from '../../components/Pagination.jsx'
 import { useToast } from '../../context/ToastContext.jsx'
+import { usePermission } from '../../hooks/usePermission.js'
 
 function Inventory() {
   const { addToast } = useToast()
+  const { canWrite } = usePermission('Inventory')
   const [movements, setMovements] = useState([])
   const [products, setProducts] = useState([])
   const [loading, setLoading] = useState(true)
@@ -73,10 +75,14 @@ function Inventory() {
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
-        <input type="text" placeholder="Search products..." value={search}
-          onChange={(e) => { setSearch(e.target.value); setStockPage(1) }}
-          className="w-full max-w-xs rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20" />
-        <button onClick={() => setModalOpen(true)} className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-indigo-500 transition-colors">+ Adjust Stock</button>
+        <div className="flex items-center gap-2">
+          <input type="text" placeholder="Search products..." value={search}
+            onChange={(e) => { setSearch(e.target.value); setStockPage(1) }}
+            className="w-full max-w-xs rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20" />
+          {tab === 'stock' && <button onClick={() => downloadCSV(['name', 'sku', 'stock', 'category'], filteredStock, `inventory-stock-${new Date().toISOString().slice(0, 10)}.csv`)} className="border border-gray-300 text-gray-600 px-4 py-2 rounded-lg text-sm hover:bg-gray-50 min-w-[120px]">Export CSV</button>}
+          {tab === 'movements' && <button onClick={() => downloadCSV(['productName', 'type', 'quantity', 'reason', 'date'], sortedMovements, `inventory-movements-${new Date().toISOString().slice(0, 10)}.csv`)} className="border border-gray-300 text-gray-600 px-4 py-2 rounded-lg text-sm hover:bg-gray-50 min-w-[120px]">Export CSV</button>}
+        </div>
+        {canWrite && <button onClick={() => setModalOpen(true)} className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-indigo-500 transition-colors">+ Adjust Stock</button>}
       </div>
 
       <div className="flex gap-1 mb-6 bg-gray-100 rounded-lg p-1 w-fit">
