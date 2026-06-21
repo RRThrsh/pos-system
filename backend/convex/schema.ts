@@ -25,6 +25,8 @@ export default defineSchema({
     category: v.string(),
     stock: v.number(),
     barcode: v.string(),
+    unitValue: v.optional(v.number()),
+    unit: v.optional(v.string()),
     createdAt: v.string(),
     updatedAt: v.string(),
   }).index("by_sku", ["sku"]),

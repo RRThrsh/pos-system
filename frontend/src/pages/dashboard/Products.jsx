@@ -1,10 +1,13 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { productsApi, categoriesApi } from '../../services/api.js'
 import Modal from '../../components/Modal.jsx'
 import Spinner from '../../components/Spinner.jsx'
 import { useToast } from '../../context/ToastContext.jsx'
+import JsBarcode from 'jsbarcode'
 
-const emptyForm = { name: '', sku: '', price: '', cost: '', category: '', stock: '', barcode: '' }
+const emptyForm = { name: '', sku: '', price: '', cost: '', category: '', stock: '', barcode: '', unitValue: '', unit: '' }
+
+const units = ['pcs', 'ml', 'L', 'g', 'kg', 'box', 'pack', 'sack', 'bottle', 'can']
 
 function Products() {
   const { addToast } = useToast()
@@ -15,6 +18,15 @@ function Products() {
   const [editing, setEditing] = useState(null)
   const [form, setForm] = useState(emptyForm)
   const [search, setSearch] = useState('')
+  const barcodeSvg = useRef(null)
+
+  useEffect(() => {
+    if (barcodeSvg.current && form.barcode) {
+      try {
+        JsBarcode(barcodeSvg.current, form.barcode, { format: 'CODE128', width: 1.5, height: 40, displayValue: true })
+      } catch { }
+    }
+  }, [form.barcode])
 
   const load = () => {
     setLoading(true)
@@ -48,6 +60,8 @@ function Products() {
       category: item.category || '',
       stock: item.stock?.toString() || '',
       barcode: item.barcode || '',
+      unitValue: item.unitValue?.toString() || '',
+      unit: item.unit || '',
     })
     setModalOpen(true)
   }
@@ -59,6 +73,8 @@ function Products() {
       price: parseFloat(form.price),
       cost: parseFloat(form.cost),
       stock: parseInt(form.stock, 10),
+      unitValue: form.unitValue ? parseFloat(form.unitValue) : undefined,
+      unit: form.unit || undefined,
     }
     try {
       if (editing) {
@@ -86,6 +102,12 @@ function Products() {
     }
   }
 
+  const formatUnit = (item) => {
+    if (item.unitValue && item.unit) return `${item.unitValue}${item.unit}`
+    if (item.unit) return item.unit
+    return ''
+  }
+
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
@@ -110,6 +132,7 @@ function Products() {
               <tr>
                 <th className="text-left px-4 py-3 font-medium">Name</th>
                 <th className="text-left px-4 py-3 font-medium">SKU</th>
+                <th className="text-left px-4 py-3 font-medium">Unit</th>
                 <th className="text-left px-4 py-3 font-medium">Category</th>
                 <th className="text-right px-4 py-3 font-medium">Price</th>
                 <th className="text-right px-4 py-3 font-medium">Cost</th>
@@ -122,6 +145,7 @@ function Products() {
                 <tr key={item._id || item.id} className="hover:bg-gray-50">
                   <td className="px-4 py-3 font-medium text-gray-900">{item.name}</td>
                   <td className="px-4 py-3 text-gray-600">{item.sku}</td>
+                  <td className="px-4 py-3 text-gray-600">{formatUnit(item)}</td>
                   <td className="px-4 py-3 text-gray-600">{item.category}</td>
                   <td className="px-4 py-3 text-right">&#8369;{Number(item.price).toLocaleString()}</td>
                   <td className="px-4 py-3 text-right">&#8369;{Number(item.cost).toLocaleString()}</td>
@@ -133,7 +157,7 @@ function Products() {
                 </tr>
               ))}
               {!items.length && (
-                <tr><td colSpan={7} className="text-center py-8 text-gray-400">No products found.</td></tr>
+                <tr><td colSpan={8} className="text-center py-8 text-gray-400">No products found.</td></tr>
               )}
             </tbody>
           </table>
@@ -164,6 +188,21 @@ function Products() {
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Unit Value</label>
+              <input type="number" step="any" min="0" placeholder="e.g. 250, 1, 500" value={form.unitValue} onChange={(e) => setForm({ ...form, unitValue: e.target.value })} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Unit</label>
+              <select value={form.unit} onChange={(e) => setForm({ ...form, unit: e.target.value })} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20">
+                <option value="">Select unit</option>
+                {units.map((u) => (
+                  <option key={u} value={u}>{u}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
               <select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20">
                 <option value="">Select category</option>
@@ -177,6 +216,11 @@ function Products() {
               <input value={form.barcode} onChange={(e) => setForm({ ...form, barcode: e.target.value })} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20" />
             </div>
           </div>
+          {form.barcode && (
+            <div className="flex justify-center bg-gray-50 rounded-lg p-3">
+              <svg ref={barcodeSvg} />
+            </div>
+          )}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Stock</label>
             <input type="number" min="0" required value={form.stock} onChange={(e) => setForm({ ...form, stock: e.target.value })} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20" />

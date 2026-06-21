@@ -39,6 +39,8 @@ CREATE TABLE products (
     category TEXT NOT NULL DEFAULT 'Uncategorized',
     stock INTEGER NOT NULL DEFAULT 0,
     barcode TEXT NOT NULL DEFAULT '',
+    unitValue REAL,
+    unit TEXT,
     createdAt TEXT NOT NULL,
     updatedAt TEXT NOT NULL
 );
@@ -121,3 +123,4 @@ CREATE INDEX idx_inventory_productId ON inventory_movements(productId);
 -- v1  - Initial schema: users, categories, products, customers, sales, inventory_movements
 -- v2  - Added suppliers table
 -- v3  - Added discount, discountType, orderType columns to sales
+-- v4  - Added unitValue, unit columns to products

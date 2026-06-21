@@ -18,7 +18,7 @@ exports.getById = async (req, res) => {
 }
 
 exports.create = async (req, res) => {
-  const { name, sku, price, cost, category, stock, barcode } = req.body
+  const { name, sku, price, cost, category, stock, barcode, unitValue, unit } = req.body
   if (!name || !sku || price === undefined) {
     return res.status(400).json({ message: "Name, SKU, and price are required." })
   }
@@ -32,6 +32,8 @@ exports.create = async (req, res) => {
       category: category || "Uncategorized",
       stock: stock !== undefined ? Number(stock) : 0,
       barcode: barcode || "",
+      unitValue: unitValue !== undefined ? Number(unitValue) : undefined,
+      unit: unit || undefined,
     })
     const product = await client.query(ref("products:getById"), { id })
     res.status(201).json(product)
@@ -51,6 +53,7 @@ exports.update = async (req, res) => {
       ...(req.body.price !== undefined && { price: Number(req.body.price) }),
       ...(req.body.cost !== undefined && { cost: Number(req.body.cost) }),
       ...(req.body.stock !== undefined && { stock: Number(req.body.stock) }),
+      ...(req.body.unitValue !== undefined && { unitValue: Number(req.body.unitValue) }),
     })
     res.json(updated)
   } catch (error) {

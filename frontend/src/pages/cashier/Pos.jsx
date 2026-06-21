@@ -228,6 +228,7 @@ function Pos() {
                 >
                   <div>
                     <span className="font-medium text-gray-900">{p.name}</span>
+                    {p.unitValue && p.unit && <span className="text-gray-400 ml-1">{p.unitValue}{p.unit}</span>}
                     <span className="text-gray-400 ml-2">{p.sku}</span>
                   </div>
                   <span className="text-indigo-600 font-semibold">&#8369;{Number(p.price).toLocaleString()}</span>
@@ -256,7 +257,10 @@ function Pos() {
               <tbody className="divide-y divide-gray-100">
                 {cart.map((c) => (
                   <tr key={c._id || c.id}>
-                    <td className="px-4 py-3 font-medium text-gray-900">{c.name}</td>
+                    <td className="px-4 py-3 font-medium text-gray-900">
+                      {c.name}
+                      {c.unitValue && c.unit && <span className="text-gray-400 ml-1 text-xs">{c.unitValue}{c.unit}</span>}
+                    </td>
                     <td className="px-4 py-3 text-center">
                       <div className="flex items-center justify-center gap-2">
                         <button onClick={() => updateQty(c._id || c.id, -1)} className="w-7 h-7 rounded-full border border-gray-300 text-gray-500 hover:bg-gray-100 transition-colors">-</button>
