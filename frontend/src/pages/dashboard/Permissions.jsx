@@ -9,7 +9,7 @@ const ALL_PAGES = [
   "Inventory", "Reports", "Users", "Suppliers", "Returns",
   "Audit Logs", "Config", "Permissions", "Monitoring",
   "Snapshots", "Analytics", "Purchase Orders", "Expenses",
-  "Promo Codes",
+  "Promo Codes", "Tables", "Customers", "Stock Counts",
 ]
 
 const ACTIONS = [

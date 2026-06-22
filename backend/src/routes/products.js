@@ -9,6 +9,7 @@ router.get('/:id', authenticate, productController.getById)
 router.post('/', authenticate, authorize('admin', 'superadmin'), checkPermission('Products', 'write'), productController.create)
 router.post('/bulk-import', authenticate, authorize('admin', 'superadmin'), checkPermission('Products', 'write'), productController.bulkImport)
 router.put('/:id', authenticate, authorize('admin', 'superadmin'), checkPermission('Products', 'write'), productController.update)
+router.post('/bulk-price', authenticate, authorize('admin', 'superadmin'), productController.bulkUpdatePrice)
 router.delete('/:id', authenticate, authorize('admin', 'superadmin'), checkPermission('Products', 'execute'), productController.remove)
 
 module.exports = router

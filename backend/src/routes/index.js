@@ -16,6 +16,9 @@ const expenseRoutes = require('./expenses')
 const promoCodeRoutes = require('./promoCodes')
 const tableRoutes = require('./tables')
 const notificationRoutes = require('./notifications')
+const heldOrderRoutes = require('./heldOrders')
+const customerRoutes = require('./customers')
+const stockCountRoutes = require('./stockCounts')
 
 const router = Router()
 
@@ -35,5 +38,8 @@ router.use('/expenses', expenseRoutes)
 router.use('/promo-codes', promoCodeRoutes)
 router.use('/tables', tableRoutes)
 router.use('/notifications', notificationRoutes)
+router.use('/held-orders', heldOrderRoutes)
+router.use('/customers', customerRoutes)
+router.use('/stock-counts', stockCountRoutes)
 
 module.exports = router

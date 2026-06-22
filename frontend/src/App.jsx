@@ -20,9 +20,12 @@ import Reports from './pages/dashboard/Reports.jsx'
 import Users from './pages/dashboard/Users.jsx'
 import Suppliers from './pages/dashboard/Suppliers.jsx'
 import Returns from './pages/dashboard/Returns.jsx'
+import Tables from './pages/dashboard/Tables.jsx'
 import PurchaseOrders from './pages/dashboard/PurchaseOrders.jsx'
 import Expenses from './pages/dashboard/Expenses.jsx'
 import PromoCodes from './pages/dashboard/PromoCodes.jsx'
+import Customers from './pages/dashboard/Customers.jsx'
+import StockCounts from './pages/dashboard/StockCounts.jsx'
 
 function App() {
   return (
@@ -57,6 +60,9 @@ function App() {
               <Route path="/dashboard/monitoring" element={<Monitoring />} />
               <Route path="/dashboard/snapshots" element={<Snapshots />} />
               <Route path="/dashboard/analytics" element={<Analytics />} />
+              <Route path="/dashboard/customers" element={<Customers />} />
+              <Route path="/dashboard/stock-counts" element={<StockCounts />} />
+              <Route path="/dashboard/tables" element={<Tables />} />
             </Route>
             <Route path="*" element={<Navigate to="/login" replace />} />
           </Routes>

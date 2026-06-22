@@ -6,7 +6,7 @@ import Pagination, { PAGE_SIZE } from '../../components/Pagination.jsx'
 import { useToast } from '../../context/ToastContext.jsx'
 import { usePermission } from '../../hooks/usePermission.js'
 
-const statusColors = { pending: 'bg-yellow-100 text-yellow-800', ordered: 'bg-blue-100 text-blue-800', received: 'bg-green-100 text-green-800', cancelled: 'bg-red-100 text-red-800' }
+const statusColors = { pending: 'bg-yellow-100 text-yellow-800', ordered: 'bg-blue-100 text-blue-800', 'partially-received': 'bg-purple-100 text-purple-800', received: 'bg-green-100 text-green-800', cancelled: 'bg-red-100 text-red-800' }
 
 function PurchaseOrders() {
   const { addToast } = useToast()
@@ -22,6 +22,8 @@ function PurchaseOrders() {
   const [selectedSupplier, setSelectedSupplier] = useState('')
   const [items, setItems] = useState([{ productId: '', productName: '', qty: 1, unitCost: 0, total: 0 }])
   const [notes, setNotes] = useState('')
+  const [receiveModal, setReceiveModal] = useState(null)
+  const [receiveItems, setReceiveItems] = useState([])
 
   const load = () => {
     setLoading(true)
@@ -81,6 +83,23 @@ function PurchaseOrders() {
     } catch (err) { addToast(err.message || 'Failed to update', 'error') }
   }
 
+  const openReceive = (o) => {
+    setReceiveModal(o)
+    setReceiveItems(o.items.map((item) => ({ productId: item.productId, productName: item.productName, expectedQty: item.qty, receivedQty: item.receivedQty || 0, receiveQty: Math.max(0, item.qty - (item.receivedQty || 0)) })))
+  }
+
+  const handleReceive = async () => {
+    if (!receiveModal) return
+    const items = receiveItems.filter((i) => i.receiveQty > 0)
+    if (items.length === 0) return addToast('Enter at least one item quantity', 'error')
+    try {
+      await purchaseOrdersApi.partialReceive(receiveModal._id, items.map((i) => ({ productId: i.productId, qty: i.receiveQty })))
+      addToast('Items received', 'success')
+      setReceiveModal(null)
+      load()
+    } catch (err) { addToast(err.message || 'Failed to receive', 'error') }
+  }
+
   const handleDelete = async (id) => {
     if (!confirm('Delete this purchase order?')) return
     try { await purchaseOrdersApi.remove(id); addToast('Purchase order deleted', 'success'); load() }
@@ -95,6 +114,7 @@ function PurchaseOrders() {
             <option value="">All Statuses</option>
             <option value="pending">Pending</option>
             <option value="ordered">Ordered</option>
+            <option value="partially-received">Partially Received</option>
             <option value="received">Received</option>
             <option value="cancelled">Cancelled</option>
           </select>
@@ -114,7 +134,7 @@ function PurchaseOrders() {
                   orders.map((o) => (
                     <tr key={o._id} className="border-b hover:bg-gray-50">
                       <td className="px-4 py-3">{o.supplierName}</td>
-                      <td className="px-4 py-3">{o.items.length} item(s)</td>
+                      <td className="px-4 py-3">{o.items.length} item(s){o.status === 'partially-received' || o.items.some(i => (i.receivedQty || 0) > 0) ? ` (${o.items.reduce((s, i) => s + (i.receivedQty || 0), 0)}/${o.items.reduce((s, i) => s + i.qty, 0)} received)` : ''}</td>
                       <td className="px-4 py-3">₱{Number(o.subtotal).toLocaleString()}</td>
                       <td className="px-4 py-3"><span className={`px-2 py-0.5 rounded-full text-xs font-medium ${statusColors[o.status] || ''}`}>{o.status}</span></td>
                       <td className="px-4 py-3 text-gray-500">{new Date(o.createdAt).toLocaleDateString()}</td>
@@ -125,8 +145,8 @@ function PurchaseOrders() {
                             <button onClick={() => handleStatus(o._id, 'cancelled')} className="text-red-600 hover:underline text-xs">Cancel</button>
                           </>
                         )}
-                        {canExecute && o.status === 'ordered' && (
-                          <button onClick={() => handleStatus(o._id, 'received')} className="text-green-600 hover:underline text-xs">Receive</button>
+                        {(canExecute && (o.status === 'ordered' || o.status === 'partially-received')) && (
+                          <button onClick={() => openReceive(o)} className="text-green-600 hover:underline text-xs">{o.status === 'partially-received' ? 'Receive More' : 'Receive'}</button>
                         )}
                         {canExecute && <button onClick={() => handleDelete(o._id)} className="text-red-600 hover:underline text-xs">Delete</button>}
                       </td>
@@ -138,6 +158,26 @@ function PurchaseOrders() {
           <Pagination page={page} totalPages={Math.ceil(total / PAGE_SIZE)} onPageChange={setPage} />
         </>
       )}
+
+      <Modal isOpen={!!receiveModal} onClose={() => setReceiveModal(null)} title={`Receive Items - ${receiveModal?.supplierName || ''}`}>
+        <div className="space-y-4">
+          {receiveItems.map((item, i) => (
+            <div key={i} className="flex gap-2 items-end p-3 bg-gray-50 rounded-lg">
+              <div className="flex-1"><p className="text-sm font-medium text-gray-700">{item.productName}</p><p className="text-xs text-gray-500">Ordered: {item.expectedQty} | Already received: {item.receivedQty}</p></div>
+              <div className="w-24">
+                <label className="text-xs text-gray-500">Receive Qty</label>
+                <input type="number" min={0} max={item.expectedQty - item.receivedQty} value={item.receiveQty}
+                  onChange={(e) => { const updated = [...receiveItems]; updated[i].receiveQty = Math.min(Number(e.target.value), item.expectedQty - item.receivedQty); setReceiveItems(updated) }}
+                  className="w-full border rounded-lg px-3 py-2 text-sm" />
+              </div>
+            </div>
+          ))}
+          <div className="flex justify-end gap-2">
+            <button onClick={() => setReceiveModal(null)} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg">Cancel</button>
+            <button onClick={handleReceive} className="px-4 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700">Receive Items</button>
+          </div>
+        </div>
+      </Modal>
 
       <Modal isOpen={modalOpen} onClose={() => setModalOpen(false)} title="New Purchase Order">
           <div className="space-y-4">

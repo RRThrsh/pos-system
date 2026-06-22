@@ -29,6 +29,20 @@ exports.updateStatus = async (req, res) => {
   res.json(updated)
 }
 
+exports.partialReceive = async (req, res) => {
+  const { receiveItems } = req.body
+  if (!receiveItems || !receiveItems.length) return res.status(400).json({ message: "Receive items required" })
+  try {
+    const updated = await client.mutation(ref("purchaseOrders:partialReceive"), { id: req.params.id, receiveItems })
+    await audit.log("partial_receive_po", req, { details: `Partial receive on PO ${req.params.id}`, itemName: req.params.id })
+    res.json(updated)
+  } catch (error) {
+    if (error.message?.startsWith("Purchase order")) return res.status(404).json({ message: error.message })
+    if (error.message?.includes("completed")) return res.status(400).json({ message: error.message })
+    throw error
+  }
+}
+
 exports.remove = async (req, res) => {
   await client.mutation(ref("purchaseOrders:remove"), { id: req.params.id })
   await audit.log("delete_purchase_order", req, { details: `Deleted PO ${req.params.id}` })

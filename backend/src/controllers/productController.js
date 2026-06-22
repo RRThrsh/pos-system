@@ -91,6 +91,16 @@ exports.bulkImport = async (req, res) => {
   res.json(results)
 }
 
+exports.bulkUpdatePrice = async (req, res) => {
+  const { productIds, price, percentageAdjustment } = req.body
+  if (!productIds || !productIds.length) return res.status(400).json({ message: "Product IDs required" })
+  try {
+    await client.mutation(ref("products:bulkUpdatePrice"), { productIds, price, percentageAdjustment })
+    await audit.log("bulk_price_update", req, { details: `Bulk price update on ${productIds.length} products` })
+    res.json({ message: `Updated ${productIds.length} products` })
+  } catch (error) { throw error }
+}
+
 exports.remove = async (req, res) => {
   try {
     await client.mutation(ref("products:remove"), { id: req.params.id })

@@ -44,6 +44,15 @@ export const toggleActive = mutation({
   },
 })
 
+export const incrementUseCount = mutation({
+  args: { code: v.string() },
+  handler: async (ctx, { code }) => {
+    const promo = await ctx.db.query("promoCodes").withIndex("by_code", (q) => q.eq("code", code.toUpperCase())).first()
+    if (!promo) throw new Error("Promo code not found")
+    await ctx.db.patch(promo._id, { useCount: (promo.useCount || 0) + 1 })
+  },
+})
+
 export const remove = mutation({
   args: { id: v.id("promoCodes") },
   handler: async (ctx, { id }) => {

@@ -32,7 +32,8 @@ export const create = mutation({
   },
   handler: async (ctx, args) => {
     const now = new Date().toISOString()
-    return await ctx.db.insert("purchaseOrders", { ...args, status: "pending", createdAt: now, updatedAt: now })
+    const itemsWithReceived = args.items.map((i) => ({ ...i, receivedQty: 0 }))
+    return await ctx.db.insert("purchaseOrders", { ...args, items: itemsWithReceived, status: "pending", createdAt: now, updatedAt: now })
   },
 })
 
@@ -45,11 +46,54 @@ export const updateStatus = mutation({
       for (const item of existing.items) {
         const product = await ctx.db.get(item.productId)
         if (product) {
-          await ctx.db.patch(item.productId, { stock: product.stock + item.qty, updatedAt: new Date().toISOString() })
+          const remaining = item.qty - (item.receivedQty || 0)
+          if (remaining > 0) {
+            await ctx.db.patch(item.productId, { stock: product.stock + remaining, updatedAt: new Date().toISOString() })
+          }
         }
       }
     }
     await ctx.db.patch(id, { status, updatedAt: new Date().toISOString() })
+    return await ctx.db.get(id)
+  },
+})
+
+export const partialReceive = mutation({
+  args: {
+    id: v.id("purchaseOrders"),
+    receiveItems: v.array(v.object({
+      productId: v.id("products"),
+      qty: v.number(),
+    })),
+  },
+  handler: async (ctx, { id, receiveItems }) => {
+    const existing = await ctx.db.get(id)
+    if (!existing) throw new Error("Purchase order not found")
+    if (existing.status === "received" || existing.status === "cancelled") throw new Error("Order already completed or cancelled")
+
+    const updatedItems = existing.items.map((item) => {
+      const ri = receiveItems.find((r) => r.productId === item.productId)
+      if (ri) {
+        const currentReceived = item.receivedQty || 0
+        const newReceived = Math.min(currentReceived + ri.qty, item.qty)
+        const toAdd = ri.qty
+        return { ...item, receivedQty: newReceived }
+      }
+      return item
+    })
+
+    for (const ri of receiveItems) {
+      const product = await ctx.db.get(ri.productId)
+      if (product) {
+        await ctx.db.patch(ri.productId, { stock: product.stock + ri.qty, updatedAt: new Date().toISOString() })
+      }
+    }
+
+    const allReceived = updatedItems.every((item) => (item.receivedQty || 0) >= item.qty)
+    const anyReceived = updatedItems.some((item) => (item.receivedQty || 0) > 0)
+    const newStatus = allReceived ? "received" : anyReceived ? "partially-received" : existing.status
+
+    await ctx.db.patch(id, { items: updatedItems, status: newStatus, updatedAt: new Date().toISOString() })
     return await ctx.db.get(id)
   },
 })

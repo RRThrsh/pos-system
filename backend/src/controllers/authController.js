@@ -90,3 +90,14 @@ exports.getMe = async (req, res) => {
   if (!user) return res.status(404).json({ message: "User not found." })
   res.json({ user: { id: user._id, firstName: user.firstName, lastName: user.lastName, username: user.username, role: user.role } })
 }
+
+exports.forgotPassword = async (req, res) => {
+  const { email } = req.body
+  if (!email) return res.status(400).json({ message: "Email is required." })
+
+  const user = await client.query(ref("users:getByUsername"), { username: email })
+  if (!user) return res.status(404).json({ message: "No account found with that email/username." })
+
+  await audit.log("forgot_password", req, { username: email, details: "Password reset requested" })
+  res.json({ message: "If that account exists, a password reset link has been sent." })
+}

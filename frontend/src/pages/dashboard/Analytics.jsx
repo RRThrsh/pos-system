@@ -11,7 +11,7 @@ function Analytics() {
   const [dailyData, setDailyData] = useState([])
   const [paymentData, setPaymentData] = useState([])
   const [bestSellers, setBestSellers] = useState([])
-  const [profitData, setProfitData] = useState({ totalRevenue: 0, totalCost: 0, totalProfit: 0 })
+  const [profitData, setProfitData] = useState({ revenue: 0, cost: 0, profit: 0 })
   const [summary, setSummary] = useState(null)
 
   useEffect(() => {
@@ -20,7 +20,7 @@ function Analytics() {
       reportsApi.dailySummaries({ period }).catch(() => []),
       reportsApi.paymentMethods({ period }).catch(() => []),
       reportsApi.bestSellers({ period, limit: '10' }).catch(() => []),
-      reportsApi.profits({ period }).catch(() => ({ totalRevenue: 0, totalCost: 0, totalProfit: 0 })),
+      reportsApi.profits({ period }).catch(() => ({ revenue: 0, cost: 0, profit: 0 })),
       reportsApi.summary().catch(() => ({})),
     ])
       .then(([daily, payments, best, profits, sum]) => {
@@ -38,7 +38,7 @@ function Analytics() {
   const totalSales = dailyData.reduce((s, d) => s + Number(d.totalSales || 0), 0)
   const totalTransactions = dailyData.reduce((s, d) => s + Number(d.transactionCount || 0), 0)
   const avgOrder = totalTransactions > 0 ? totalSales / totalTransactions : 0
-  const totalProfit = profitData.totalProfit || 0
+  const totalProfit = profitData.profit || 0
 
   return (
     <div className="space-y-6">
@@ -93,11 +93,11 @@ function Analytics() {
           <h3 className="text-sm font-medium text-gray-500 mb-4">Revenue vs Cost</h3>
           <div className="space-y-4">
             {[
-              { label: 'Revenue', value: profitData.totalRevenue || 0, color: 'bg-blue-500' },
-              { label: 'Cost', value: profitData.totalCost || 0, color: 'bg-red-500' },
+              { label: 'Revenue', value: profitData.revenue || 0, color: 'bg-blue-500' },
+              { label: 'Cost', value: profitData.cost || 0, color: 'bg-red-500' },
               { label: 'Profit', value: totalProfit, color: totalProfit >= 0 ? 'bg-green-500' : 'bg-red-500' },
             ].map((item) => {
-              const max = Math.max(profitData.totalRevenue || 1, 1)
+              const max = Math.max(profitData.revenue || 1, 1)
               const pct = (item.value / max) * 100
               return (
                 <div key={item.label}>

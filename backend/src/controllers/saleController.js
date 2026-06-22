@@ -19,22 +19,38 @@ exports.getById = async (req, res) => {
 }
 
 exports.create = async (req, res) => {
-  const { items, transactionId, paymentMethod, amountPaid } = req.body
+  const { items, transactionId, paymentMethod, amountPaid, discount, discountType, orderType, promoCode, tax, taxRate, customerId, customerName, customerPhone, buyerTin, notes, itemNotes } = req.body
 
   if (!items || !items.length) {
     return res.status(400).json({ message: "Sale must include at least one item." })
   }
 
   try {
+    const { number: receiptNumber } = await client.mutation(ref("sales:nextReceiptNumber"))
     const id = await client.mutation(ref("sales:create"), {
-      items: items.map((i) => ({ productId: i.productId, qty: i.qty })),
+      items: items.map((i) => ({ productId: i.productId, qty: i.qty, notes: i.notes })),
       transactionId,
+      receiptNumber,
       paymentMethod: paymentMethod || "cash",
       amountPaid: amountPaid ? Number(amountPaid) : undefined,
+      discount: discount ? Number(discount) : undefined,
+      discountType,
+      orderType: orderType || "walk-in",
+      promoCode,
+      tax: tax ? Number(tax) : undefined,
+      taxRate: taxRate ? Number(taxRate) : undefined,
+      customerId,
+      customerName,
+      customerPhone,
+      buyerTin,
+      notes,
       createdBy: req.user?.id,
     })
     const sale = await client.query(ref("sales:getById"), { id })
-    await audit.log("create_sale", req, { details: `Sale #${sale.transactionId || id} - ₱${sale.total} (${items.length} items)`, itemId: id })
+    if (promoCode) {
+      client.mutation(ref("promoCodes:incrementUseCount"), { code: promoCode }).catch(() => {})
+    }
+    await audit.log("create_sale", req, { details: `Sale #${receiptNumber || sale.transactionId || id} - ₱${sale.total} (${items.length} items)`, itemId: id })
     res.status(201).json(sale)
   } catch (error) {
     if (error.message?.startsWith("Product") || error.message?.startsWith("Insufficient")) {
@@ -50,12 +66,22 @@ exports.voidSale = async (req, res) => {
     await audit.log("void_sale", req, { details: `Voided sale ${req.params.id}`, itemId: req.params.id })
     res.json(sale)
   } catch (error) {
-    if (error.message === "Sale not found") {
-      return res.status(404).json({ message: "Sale not found." })
-    }
-    if (error.message === "Sale is already voided") {
-      return res.status(400).json({ message: "Sale is already voided." })
-    }
+    if (error.message === "Sale not found") return res.status(404).json({ message: "Sale not found." })
+    if (error.message === "Sale is already voided") return res.status(400).json({ message: "Sale is already voided." })
+    throw error
+  }
+}
+
+exports.partialVoid = async (req, res) => {
+  const { returnItems } = req.body
+  if (!returnItems || !returnItems.length) return res.status(400).json({ message: "Return items required" })
+  try {
+    const sale = await client.mutation(ref("sales:partialVoid"), { id: req.params.id, returnItems })
+    await audit.log("partial_return", req, { details: `Partial return on sale ${req.params.id}`, itemId: req.params.id })
+    res.json(sale)
+  } catch (error) {
+    if (error.message === "Sale not found") return res.status(404).json({ message: "Sale not found." })
+    if (error.message === "Sale is already voided") return res.status(400).json({ message: "Sale is already voided." })
     throw error
   }
 }

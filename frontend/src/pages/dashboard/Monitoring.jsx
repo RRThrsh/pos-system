@@ -37,7 +37,7 @@ function Monitoring() {
             {[
               { label: 'Products', value: summary?.totalProducts },
               { label: 'Users', value: summary?.totalUsers },
-              { label: 'Categories', value: summary?.totalCategories },
+              { label: 'Categories', value: summary?.totalCategories ?? '-' },
               { label: 'Sales Records', value: summary?.totalSales },
             ].map((s) => (
               <div key={s.label} className="flex justify-between">
@@ -53,9 +53,9 @@ function Monitoring() {
           <div className="space-y-3">
             {[
               { label: 'Total Revenue', value: `₱${Number(summary?.totalRevenue || 0).toLocaleString()}` },
-              { label: 'Total Profit', value: `₱${Number(summary?.totalProfit || 0).toLocaleString()}` },
-              { label: 'Total Cost', value: `₱${Number(summary?.totalCost || 0).toLocaleString()}` },
-              { label: 'Today Sales', value: `₱${Number(summary?.todaySales || 0).toLocaleString()}` },
+              { label: 'Today Revenue', value: `₱${Number(summary?.todayRevenue || 0).toLocaleString()}` },
+              { label: 'Today Sales Count', value: summary?.todaySales || 0 },
+              { label: 'Total Products', value: summary?.totalProducts || 0 },
             ].map((s) => (
               <div key={s.label} className="flex justify-between">
                 <span className="text-gray-600">{s.label}</span>

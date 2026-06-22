@@ -14,5 +14,7 @@ router.get('/payment-methods', authenticate, authorize('admin', 'superadmin'), c
 router.get('/hourly-sales', authenticate, authorize('admin', 'superadmin'), checkPermission('Reports', 'read'), reportController.hourlySales)
 router.get('/active-users', authenticate, authorize('admin', 'superadmin'), checkPermission('Reports', 'read'), reportController.activeUsersToday)
 router.get('/category-sales', authenticate, authorize('admin', 'superadmin'), checkPermission('Reports', 'read'), reportController.categorySales)
+router.get('/pnl', authenticate, authorize('admin', 'superadmin'), checkPermission('Reports', 'read'), reportController.profitAndLoss)
+router.get('/slow-moving', authenticate, authorize('admin', 'superadmin'), checkPermission('Reports', 'read'), reportController.slowMoving)
 
 module.exports = router

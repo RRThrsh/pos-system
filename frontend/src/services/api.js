@@ -67,6 +67,7 @@ export const productsApi = {
   create: (payload) => request('/products', { method: 'POST', body: JSON.stringify(payload) }),
   update: (id, payload) => request(`/products/${id}`, { method: 'PUT', body: JSON.stringify(payload) }),
   remove: (id) => request(`/products/${id}`, { method: 'DELETE' }),
+  bulkUpdatePrice: (payload) => request('/products/bulk-price', { method: 'POST', body: JSON.stringify(payload) }),
 }
 
 export const categoriesApi = {
@@ -81,6 +82,7 @@ export const salesApi = {
   getById: (id) => request(`/sales/${id}`),
   create: (payload) => request('/sales', { method: 'POST', body: JSON.stringify(payload) }),
   voidSale: (id) => request(`/sales/${id}/void`, { method: 'POST' }),
+  partialVoid: (id, returnItems) => request(`/sales/${id}/partial-void`, { method: 'POST', body: JSON.stringify({ returnItems }) }),
 }
 
 export const inventoryApi = {
@@ -114,6 +116,8 @@ export const reportsApi = {
   hourlySales: (params) => request(`/reports/hourly-sales?${new URLSearchParams(params)}`),
   activeUsers: () => request('/reports/active-users'),
   categorySales: (params) => request(`/reports/category-sales?${new URLSearchParams(params)}`),
+  pnl: (params) => request(`/reports/pnl?${new URLSearchParams(params)}`),
+  slowMoving: (params) => request(`/reports/slow-moving?${new URLSearchParams(params)}`),
 }
 
 export const configApi = {
@@ -122,7 +126,7 @@ export const configApi = {
   set: (key, value) => request('/config/set', { method: 'POST', body: JSON.stringify({ key, value }) }),
   systemInfo: () => request('/config/system-info'),
   resetAuditLogs: () => request('/config/reset-audit-logs', { method: 'POST' }),
-  backup: () => requestBlob('/config/backup', { method: 'POST' }),
+  backup: (full) => requestBlob(`/config/backup?full=${full}`, { method: 'POST' }),
 }
 
 export const permissionsApi = {
@@ -138,6 +142,7 @@ export const purchaseOrdersApi = {
   getById: (id) => request(`/purchase-orders/${id}`),
   create: (payload) => request('/purchase-orders', { method: 'POST', body: JSON.stringify(payload) }),
   updateStatus: (id, status) => request(`/purchase-orders/${id}/status`, { method: 'PATCH', body: JSON.stringify({ status }) }),
+  partialReceive: (id, items) => request(`/purchase-orders/${id}/receive`, { method: 'POST', body: JSON.stringify({ items }) }),
   remove: (id) => request(`/purchase-orders/${id}`, { method: 'DELETE' }),
 }
 
@@ -152,7 +157,50 @@ export const promoCodesApi = {
   getByCode: (code) => request(`/promo-codes/${code}`),
   create: (payload) => request('/promo-codes', { method: 'POST', body: JSON.stringify(payload) }),
   toggleActive: (id, isActive) => request(`/promo-codes/${id}/toggle`, { method: 'PATCH', body: JSON.stringify({ isActive }) }),
+  validate: (code, subtotal) => request('/promo-codes/validate', { method: 'POST', body: JSON.stringify({ code, subtotal }) }),
   remove: (id) => request(`/promo-codes/${id}`, { method: 'DELETE' }),
+}
+
+export const customersApi = {
+  getAll: () => request('/customers'),
+  search: (q) => request(`/customers/search?q=${encodeURIComponent(q)}`),
+  getById: (id) => request(`/customers/${id}`),
+  create: (payload) => request('/customers', { method: 'POST', body: JSON.stringify(payload) }),
+  update: (id, payload) => request(`/customers/${id}`, { method: 'PUT', body: JSON.stringify(payload) }),
+  remove: (id) => request(`/customers/${id}`, { method: 'DELETE' }),
+  addLoyaltyPoints: (id, points) => request(`/customers/${id}/loyalty`, { method: 'POST', body: JSON.stringify({ points }) }),
+}
+
+export const stockCountsApi = {
+  getAll: () => request('/stock-counts'),
+  getById: (id) => request(`/stock-counts/${id}`),
+  create: (payload) => request('/stock-counts', { method: 'POST', body: JSON.stringify(payload) }),
+  remove: (id) => request(`/stock-counts/${id}`, { method: 'DELETE' }),
+}
+
+export const priceHistoryApi = {
+  list: (productId) => request(`/price-history?productId=${productId}`),
+}
+
+export const heldOrdersApi = {
+  getAll: () => request('/held-orders'),
+  getById: (id) => request(`/held-orders/${id}`),
+  create: (payload) => request('/held-orders', { method: 'POST', body: JSON.stringify(payload) }),
+  remove: (id) => request(`/held-orders/${id}`, { method: 'DELETE' }),
+}
+
+export const tablesApi = {
+  getAll: () => request('/tables'),
+  create: (payload) => request('/tables', { method: 'POST', body: JSON.stringify(payload) }),
+  updateStatus: (id, status, currentSaleId) => request(`/tables/${id}/status`, { method: 'PATCH', body: JSON.stringify({ status, currentSaleId }) }),
+  remove: (id) => request(`/tables/${id}`, { method: 'DELETE' }),
+}
+
+export const notificationsApi = {
+  getAll: (params) => request(`/notifications?${new URLSearchParams(params)}`),
+  unreadCount: () => request('/notifications/unread-count'),
+  markRead: (id) => request(`/notifications/${id}/read`, { method: 'POST' }),
+  markAllRead: () => request('/notifications/read-all', { method: 'POST' }),
 }
 
 export function downloadCSV(headers, rows, filename) {

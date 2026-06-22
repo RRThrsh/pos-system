@@ -11,7 +11,18 @@ exports.getAll = async (req, res) => {
 
 exports.get = async (req, res) => {
   const config = await client.query(ref("config:get"), { key: req.params.key })
-  if (!config) return res.status(404).json({ message: "Config key not found." })
+  if (!config) {
+    if (req.params.key === 'shortcuts') {
+      const defaults = JSON.stringify({
+        charge: { key: 'F2', label: 'Charge / Checkout', description: 'Complete the current sale' },
+        scan: { key: 'F3', label: 'Focus Barcode Input', description: 'Focus the barcode scanning field' },
+        quickKeys: { key: 'F4', label: 'Toggle Quick Keys', description: 'Show/hide quick product buttons' },
+        close: { key: 'Escape', label: 'Close Modals', description: 'Close receipt or held orders panel' },
+      })
+      return res.json({ key: 'shortcuts', value: defaults })
+    }
+    return res.status(404).json({ message: "Config key not found." })
+  }
   res.json(config)
 }
 
@@ -40,6 +51,7 @@ exports.systemInfo = async (req, res) => {
     nodeVersion: process.version,
     platform: process.platform,
     uptime: Math.floor(process.uptime()),
+    memoryUsage: process.memoryUsage(),
     totalUsers: users.length,
     totalProducts: products.total,
     totalSales: sales.total,
@@ -49,14 +61,15 @@ exports.systemInfo = async (req, res) => {
 }
 
 exports.backup = async (req, res) => {
+  const full = req.query.full === 'true'
   const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
 
-  const isRecent = (item) => {
+  const isRecent = full ? (() => true) : (item) => {
     const d = item.createdAt || item.updatedAt
     return d && d >= sevenDaysAgo
   }
 
-  const [users, productsRes, categories, salesRes, suppliersRes, inventory, auditRes, configs] = await Promise.all([
+  const [users, productsRes, categories, salesRes, suppliersRes, inventory, auditRes, configs, customers, stockCounts, priceHistory] = await Promise.all([
     client.query(ref("users:list")),
     client.query(ref("products:list"), { page: 1, limit: 50000 }),
     client.query(ref("categories:list")),
@@ -65,6 +78,9 @@ exports.backup = async (req, res) => {
     client.query(ref("inventory:list")),
     client.query(ref("auditLogs:list"), { limit: 50000, offset: 0 }),
     client.query(ref("config:list")),
+    client.query(ref("customers:list")).catch(() => []),
+    client.query(ref("stockCounts:list")).catch(() => []),
+    client.query(ref("priceHistory:list")).catch(() => []),
   ])
 
   const sanitized = users.filter(isRecent).map(({ password, ...u }) => u)
@@ -75,29 +91,26 @@ exports.backup = async (req, res) => {
   const movements = (inventory || []).filter(isRecent)
   const cats = (categories || []).filter(isRecent)
   const cfg = (configs || []).filter(isRecent)
+  const custs = (customers || []).filter(isRecent)
+  const counts = (stockCounts || []).filter(isRecent)
+  const ph = (priceHistory || []).filter(isRecent)
 
   const wb = XLSX.utils.book_new()
 
-  const sheets = {
-    Users: sanitized,
-    Products: products,
-    Sales: sales,
-    Categories: cats,
-    Suppliers: suppliers,
-    Inventory: movements,
-    AuditLogs: auditLogs,
-    Config: cfg,
-  }
+  const sheets = { Users: sanitized, Products: products, Sales: sales, Categories: cats, Suppliers: suppliers, Inventory: movements, AuditLogs: auditLogs, Config: cfg, Customers: custs, StockCounts: counts, PriceHistory: ph }
 
   for (const [name, data] of Object.entries(sheets)) {
-    const ws = XLSX.utils.json_to_sheet(data)
-    XLSX.utils.book_append_sheet(wb, ws, name)
+    if (data.length) {
+      const ws = XLSX.utils.json_to_sheet(data)
+      XLSX.utils.book_append_sheet(wb, ws, name)
+    }
   }
 
-  await audit.log("backup", req, { details: "7-day backup exported as Excel" })
+  await audit.log("backup", req, { details: `${full ? 'Full' : '7-day'} backup exported as Excel` })
 
   const buf = XLSX.write(wb, { type: "buffer", bookType: "xlsx" })
-  const filename = `pos-backup-7day-${new Date().toISOString().slice(0, 10)}.xlsx`
+  const suffix = full ? 'full' : '7day'
+  const filename = `pos-backup-${suffix}-${new Date().toISOString().slice(0, 10)}.xlsx`
   res.set("Content-Disposition", `attachment; filename="${filename}"`)
   res.set("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
   res.send(buf)

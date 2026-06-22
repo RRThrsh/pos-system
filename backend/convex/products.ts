@@ -48,6 +48,9 @@ export const create = mutation({
     unitValue: v.optional(v.number()),
     unit: v.optional(v.string()),
     image: v.optional(v.string()),
+    minStock: v.optional(v.number()),
+    maxStock: v.optional(v.number()),
+    reorderPoint: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     const existing = await ctx.db.query("products").withIndex("by_sku", (q) => q.eq("sku", args.sku)).first()
@@ -65,6 +68,9 @@ export const create = mutation({
       unitValue: args.unitValue,
       unit: args.unit,
       image: args.image,
+      minStock: args.minStock,
+      maxStock: args.maxStock,
+      reorderPoint: args.reorderPoint,
       createdAt: now,
       updatedAt: now,
     })
@@ -84,6 +90,9 @@ export const update = mutation({
     unitValue: v.optional(v.number()),
     unit: v.optional(v.string()),
     image: v.optional(v.string()),
+    minStock: v.optional(v.number()),
+    maxStock: v.optional(v.number()),
+    reorderPoint: v.optional(v.number()),
   },
   handler: async (ctx, { id, ...fields }) => {
     const existing = await ctx.db.get(id)
@@ -92,6 +101,19 @@ export const update = mutation({
     if (fields.sku && fields.sku !== existing.sku) {
       const dup = await ctx.db.query("products").withIndex("by_sku", (q) => q.eq("sku", fields.sku!)).first()
       if (dup) throw new Error("SKU already exists")
+    }
+
+    if ((fields.price !== undefined && fields.price !== existing.price) || (fields.cost !== undefined && fields.cost !== existing.cost)) {
+      await ctx.db.insert("priceHistory", {
+        productId: id,
+        oldPrice: existing.price,
+        newPrice: fields.price ?? existing.price,
+        oldCost: fields.cost !== undefined ? existing.cost : undefined,
+        newCost: fields.cost !== undefined ? fields.cost : undefined,
+        changedBy: fields.createdBy,
+        reason: fields.price !== existing.price ? "Manual price update" : "Manual cost update",
+        createdAt: new Date().toISOString(),
+      })
     }
 
     await ctx.db.patch(id, { ...fields, updatedAt: new Date().toISOString() })
@@ -105,5 +127,35 @@ export const remove = mutation({
     const existing = await ctx.db.get(id)
     if (!existing) throw new Error("Product not found")
     await ctx.db.delete(id)
+  },
+})
+
+export const bulkUpdatePrice = mutation({
+  args: {
+    productIds: v.array(v.id("products")),
+    price: v.optional(v.number()),
+    cost: v.optional(v.number()),
+    percentageAdjustment: v.optional(v.number()),
+  },
+  handler: async (ctx, { productIds, price, cost, percentageAdjustment }) => {
+    const now = new Date().toISOString()
+    for (const id of productIds) {
+      const existing = await ctx.db.get(id)
+      if (!existing) continue
+      const newPrice = price ?? (percentageAdjustment ? existing.price * (1 + percentageAdjustment / 100) : existing.price)
+      const newCost = cost ?? existing.cost
+      if (newPrice !== existing.price || newCost !== existing.cost) {
+        await ctx.db.insert("priceHistory", {
+          productId: id,
+          oldPrice: existing.price,
+          newPrice,
+          oldCost: existing.cost,
+          newCost,
+          reason: "Bulk update",
+          createdAt: now,
+        })
+      }
+      await ctx.db.patch(id, { price: newPrice, cost: newCost, updatedAt: now })
+    }
   },
 })

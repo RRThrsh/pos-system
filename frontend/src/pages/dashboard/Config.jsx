@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import Spinner from '../../components/Spinner.jsx'
 import { useToast } from '../../context/ToastContext.jsx'
 import { configApi } from '../../services/api.js'
+import { SHORTCUT_ACTIONS, getDefaultShortcuts } from '../../constants/shortcuts.js'
 
 function Config() {
   const { addToast } = useToast()
@@ -10,6 +11,9 @@ function Config() {
   const [registrationOpen, setRegistrationOpen] = useState(true)
   const [systemInfo, setSystemInfo] = useState(null)
   const [backupLoading, setBackupLoading] = useState(false)
+  const [fullBackupLoading, setFullBackupLoading] = useState(false)
+  const [shortcuts, setShortcuts] = useState(getDefaultShortcuts())
+  const [shortcutSaving, setShortcutSaving] = useState(false)
   const [resetLoading, setResetLoading] = useState(false)
   const [cacheCleared, setCacheCleared] = useState(false)
 
@@ -24,7 +28,12 @@ function Config() {
         setSystemInfo(info)
       })
       .catch(() => addToast('Failed to load config', 'error'))
-      .finally(() => setLoading(false))
+    configApi.get('shortcuts').then((res) => {
+      if (res && res.value) {
+        try { const parsed = JSON.parse(res.value); setShortcuts(parsed) } catch {}
+      }
+    }).catch(() => {})
+    setLoading(false)
   }, [])
 
   const toggleMaintenance = async () => {
@@ -70,15 +79,43 @@ function Config() {
     setTimeout(() => setCacheCleared(false), 3000)
   }
 
-  const handleBackup = async () => {
-    setBackupLoading(true)
+  const handleShortcutChange = (id, newKey) => {
+    setShortcuts((prev) => ({ ...prev, [id]: { ...prev[id], key: newKey } }))
+  }
+
+  const handleSaveShortcuts = async () => {
+    setShortcutSaving(true)
     try {
-      await configApi.backup()
-      addToast('Backup downloaded', 'success')
+      await configApi.set('shortcuts', JSON.stringify(shortcuts))
+      addToast('Shortcuts saved', 'success')
+    } catch (err) {
+      addToast(err.message || 'Failed to save shortcuts', 'error')
+    } finally {
+      setShortcutSaving(false)
+    }
+  }
+
+  const handleResetShortcuts = async () => {
+    const defaults = getDefaultShortcuts()
+    setShortcuts(defaults)
+    try {
+      await configApi.set('shortcuts', JSON.stringify(defaults))
+      addToast('Shortcuts reset to defaults', 'success')
+    } catch (err) {
+      addToast(err.message || 'Failed to reset shortcuts', 'error')
+    }
+  }
+
+  const handleBackup = async (full) => {
+    const fn = full ? setFullBackupLoading : setBackupLoading
+    fn(true)
+    try {
+      await configApi.backup(full)
+      addToast(`${full ? 'Full ' : ''}Backup downloaded`, 'success')
     } catch (err) {
       addToast(err.message || 'Backup failed', 'error')
     } finally {
-      setBackupLoading(false)
+      fn(false)
     }
   }
 
@@ -148,10 +185,53 @@ function Config() {
               <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 9.776c.112-.017.227-.026.344-.026h15.812c.117 0 .232.009.344.026m-16.5 0a2.25 2.25 0 00-1.883 2.542l.857 6a2.25 2.25 0 002.227 1.932H19.05a2.25 2.25 0 002.227-1.932l.857-6a2.25 2.25 0 00-1.883-2.542m-16.5 0V6A2.25 2.25 0 016 3.75h3.879a1.5 1.5 0 011.06.44l2.122 2.12a1.5 1.5 0 001.06.44H18A2.25 2.25 0 0120.25 9v.776" />
             </svg>
           </div>
-          <p className="text-sm text-gray-500 mb-4">Export all system data (users, products, sales, inventory, audit logs) as a JSON file.</p>
-          <button onClick={handleBackup} disabled={backupLoading} className="px-4 py-2 rounded-lg text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 transition-colors">
-            {backupLoading ? 'Exporting...' : 'Download Backup'}
-          </button>
+          <p className="text-sm text-gray-500 mb-4">Export all system data (users, products, sales, inventory, audit logs). Full backup also includes customers, stock counts, and price history.</p>
+          <div className="flex gap-2">
+            <button onClick={() => handleBackup(false)} disabled={backupLoading} className="px-4 py-2 rounded-lg text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 transition-colors">
+              {backupLoading ? 'Exporting...' : 'Download Backup'}
+            </button>
+            <button onClick={() => handleBackup(true)} disabled={fullBackupLoading} className="px-4 py-2 rounded-lg text-sm font-medium text-white bg-gray-700 hover:bg-gray-800 disabled:opacity-50 transition-colors">
+              {fullBackupLoading ? 'Exporting...' : 'Full Backup'}
+            </button>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-lg shadow p-6">
+          <div className="flex items-center justify-between mb-1">
+            <h3 className="text-lg font-semibold text-gray-800">Shortcut Keys</h3>
+            <svg className="w-5 h-5 text-gray-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.325.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 0 1 1.37.49l1.296 2.247a1.125 1.125 0 0 1-.26 1.431l-1.003.827c-.293.241-.438.613-.431.992a7.723 7.723 0 0 1 0 .255c-.007.378.138.75.43.991l1.004.827c.424.35.534.955.26 1.43l-1.298 2.247a1.125 1.125 0 0 1-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 0 1-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 0 1-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 0 1-1.369-.49l-1.297-2.247a1.125 1.125 0 0 1 .26-1.431l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 0 1 0-.255c.007-.378-.138-.75-.43-.991l-1.004-.827a1.125 1.125 0 0 1-.26-1.43l1.297-2.247a1.125 1.125 0 0 1 1.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.28Z" />
+            </svg>
+          </div>
+          <p className="text-sm text-gray-500 mb-4">Customize POS keyboard shortcuts. Press a key to change. Defaults: F2=Charge, F3=Scan, F4=Quick Keys, Esc=Close.</p>
+          <div className="space-y-2 mb-3">
+            {SHORTCUT_ACTIONS.map((action) => (
+              <div key={action.id} className="flex items-center gap-3 text-sm">
+                <div className="flex-1">
+                  <span className="font-medium text-gray-800">{action.label}</span>
+                  <p className="text-xs text-gray-400">{action.description}</p>
+                </div>
+                <input
+                  value={shortcuts[action.id]?.key || ''}
+                  onChange={(e) => {
+                    const val = e.target.value
+                    if (val.length <= 20) handleShortcutChange(action.id, val)
+                  }}
+                  placeholder="Key"
+                  className="w-28 text-center border border-gray-300 rounded-lg px-2 py-1.5 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  onKeyDown={(e) => { e.preventDefault(); handleShortcutChange(action.id, e.key); e.target.blur() }}
+                />
+              </div>
+            ))}
+          </div>
+          <div className="flex gap-2">
+            <button onClick={handleSaveShortcuts} disabled={shortcutSaving} className="px-4 py-2 rounded-lg text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 transition-colors">
+              {shortcutSaving ? 'Saving...' : 'Save Shortcuts'}
+            </button>
+            <button onClick={handleResetShortcuts} className="px-4 py-2 rounded-lg text-sm font-medium text-gray-700 border border-gray-300 hover:bg-gray-50 transition-colors">
+              Reset to Default
+            </button>
+          </div>
         </div>
 
         <div className="bg-white rounded-lg shadow p-6">

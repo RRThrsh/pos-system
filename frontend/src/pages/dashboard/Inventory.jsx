@@ -122,13 +122,13 @@ function Inventory() {
                       <td className="px-4 py-3 text-gray-600">{p.sku}</td>
                       <td className="px-4 py-3 text-gray-600">{p.category}</td>
                       <td className="px-4 py-3 text-right">&#8369;{Number(p.price).toLocaleString()}</td>
-                      <td className={`px-4 py-3 text-right font-medium ${p.stock <= 5 ? 'text-red-600' : p.stock <= 10 ? 'text-yellow-600' : 'text-gray-900'}`}>{p.stock}</td>
+                      <td className={`px-4 py-3 text-right font-medium ${p.stock <= 0 ? 'text-red-600 font-bold' : p.reorderPoint && p.stock <= p.reorderPoint ? 'text-orange-600 font-bold' : p.stock <= 5 ? 'text-yellow-600' : 'text-gray-900'}`}>{p.stock}</td>
                       <td className="px-4 py-3 text-right">
                         {p.stock === 0 ? (
                           <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">Out of Stock</span>
+                        ) : p.reorderPoint && p.stock <= p.reorderPoint ? (
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-800">Reorder</span>
                         ) : p.stock <= 5 ? (
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">Critical</span>
-                        ) : p.stock <= 10 ? (
                           <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">Low</span>
                         ) : (
                           <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">In Stock</span>

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { salesApi } from '../../services/api.js'
+import { salesApi, auditLogsApi } from '../../services/api.js'
 import Modal from '../../components/Modal.jsx'
 import Spinner from '../../components/Spinner.jsx'
 import Pagination, { PAGE_SIZE } from '../../components/Pagination.jsx'
@@ -13,6 +13,7 @@ function Returns() {
   const [loading, setLoading] = useState(true)
   const [viewItem, setViewItem] = useState(null)
   const [returnItems, setReturnItems] = useState([])
+  const [returnReason, setReturnReason] = useState('')
   const [processing, setProcessing] = useState(false)
   const [page, setPage] = useState(1)
 
@@ -28,6 +29,7 @@ function Returns() {
 
   const openReturn = (sale) => {
     setViewItem(sale)
+    setReturnReason('')
     setReturnItems((sale.items || []).map((item) => ({
       ...item,
       returnQty: 0,
@@ -51,7 +53,16 @@ function Returns() {
     if (!toReturn.length) return
     setProcessing(true)
     try {
-      await salesApi.voidSale(viewItem._id || viewItem.id)
+      const saleId = viewItem._id || viewItem.id
+      const allItems = (viewItem.items || []).reduce((s, i) => s + (i.qty || i.quantity || 0), 0)
+      const returnTotal = toReturn.reduce((s, i) => s + (i.qty || i.quantity || 0), 0)
+      const isFullReturn = returnTotal >= allItems
+
+      if (isFullReturn) {
+        await salesApi.voidSale(saleId)
+      } else {
+        await salesApi.partialVoid(saleId, toReturn.map((i) => ({ productId: i.productId || i._id, qty: i.returnQty })))
+      }
       const refundTotal = toReturn.reduce((s, i) => s + i.price * i.returnQty, 0)
       addToast(`Return processed. Refund: \u20B1${refundTotal.toLocaleString()}`, 'success')
       setViewItem(null)
@@ -149,7 +160,18 @@ function Returns() {
               <span>Refund Total</span>
               <span className="text-orange-600">&#8369;{returnItems.reduce((s, i) => s + i.price * i.returnQty, 0).toLocaleString()}</span>
             </div>
-            <p className="text-xs text-gray-400">Processing a return will void the original sale and restore stock.</p>
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Return Reason</label>
+              <select value={returnReason} onChange={(e) => setReturnReason(e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm">
+                <option value="">Select reason...</option>
+                <option value="defective">Defective / Damaged</option>
+                <option value="wrong_item">Wrong Item</option>
+                <option value="customer_request">Customer Request</option>
+                <option value="exchange">Exchange</option>
+                <option value="other">Other</option>
+              </select>
+            </div>
+            <p className="text-xs text-gray-400">Processing a return will restore stock for selected items.</p>
             <div className="flex justify-end gap-3 pt-2">
               <button type="button" onClick={() => setViewItem(null)} className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800">Cancel</button>
               <button

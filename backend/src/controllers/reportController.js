@@ -30,7 +30,7 @@ exports.salesReport = async (req, res) => {
 
 exports.inventoryReport = async (req, res) => {
   const products = await client.query(ref("products:list"), {})
-  const lowStock = products.data.filter((p) => p.stock <= 10)
+  const lowStock = products.data.filter((p) => p.reorderPoint ? p.stock <= p.reorderPoint : p.stock <= 10)
   res.json({
     lowStock,
     summary: {
@@ -42,10 +42,11 @@ exports.inventoryReport = async (req, res) => {
 }
 
 exports.summary = async (req, res) => {
-  const [allSales, allProducts, users] = await Promise.all([
+  const [allSales, allProducts, users, allCategories] = await Promise.all([
     client.query(ref("sales:list"), { limit: 99999 }),
     client.query(ref("products:list"), { limit: 99999 }),
     client.query(ref("users:list")),
+    client.query(ref("categories:list")),
   ])
 
   const salesData = allSales.data
@@ -66,7 +67,7 @@ exports.summary = async (req, res) => {
   const todayRevenue = todaySales.reduce((sum, s) => sum + s.total, 0)
   const yesterdayRevenue = yesterdaySales.reduce((sum, s) => sum + s.total, 0)
   const totalRevenue = salesData.reduce((sum, s) => sum + s.total, 0)
-  const lowStockCount = productsData.filter((p) => p.stock <= 10).length
+  const lowStockCount = productsData.filter((p) => p.reorderPoint ? p.stock <= p.reorderPoint : p.stock <= 10).length
   const voidedCount = salesData.filter((s) => s.status === "voided").length
   const todayVoidedCount = todaySales.filter((s) => s.status === "voided").length
   const todayDiscAmount = todaySales.reduce((sum, s) => sum + (s.discount || 0), 0)
@@ -88,6 +89,7 @@ exports.summary = async (req, res) => {
     todayDiscAmount,
     todayItems,
     inventoryValue: invValue,
+    totalCategories: allCategories.length,
   })
 }
 
@@ -229,3 +231,93 @@ exports.profitsReport = async (req, res) => {
 
   res.json({ revenue, cost, profit: revenue - cost, totalSales: filtered.length })
 }
+
+exports.profitAndLoss = async (req, res) => {
+  const { dateFrom, dateTo } = req.query
+  const [salesRes, expensesRes] = await Promise.all([
+    client.query(ref("sales:list"), { dateFrom, dateTo }),
+    client.query(ref("expenses:list"), { dateFrom, dateTo }),
+  ])
+  const sales = salesRes.data || []
+  const expenses = expensesRes.data || []
+
+  const totalRevenue = sales.reduce((s, sale) => s + sale.total, 0)
+  const productCosts = {}
+  const products = await client.query(ref("products:list"), {})
+  products.data.forEach((p) => { productCosts[p._id] = p.cost || 0 })
+  const cogs = sales.reduce((s, sale) => {
+    return s + (sale.items || []).reduce((si, item) => si + (productCosts[item.productId] || 0) * item.qty, 0)
+  }, 0)
+  const grossProfit = totalRevenue - cogs
+  const totalExpenses = expenses.reduce((s, e) => s + e.amount, 0)
+  const netProfit = grossProfit - totalExpenses
+  const voidedSales = sales.filter((s) => s.status === "voided").reduce((s, sale) => s + sale.total, 0)
+  const totalDiscounts = sales.reduce((s, sale) => s + (sale.discount || 0), 0)
+
+  const byCategory = {}
+  for (const e of expenses) {
+    const cat = e.category || "Other"
+    if (!byCategory[cat]) byCategory[cat] = 0
+    byCategory[cat] += e.amount
+  }
+
+  res.json({
+    period: { dateFrom, dateTo },
+    totalRevenue,
+    cogs,
+    grossProfit,
+    grossMargin: totalRevenue > 0 ? (grossProfit / totalRevenue) * 100 : 0,
+    totalExpenses,
+    expensesByCategory: byCategory,
+    netProfit,
+    netMargin: totalRevenue > 0 ? (netProfit / totalRevenue) * 100 : 0,
+    totalTransactions: sales.length,
+    voidedSales,
+    totalDiscounts,
+  })
+}
+
+exports.slowMoving = async (req, res) => {
+  const { days = 90 } = req.query
+  const threshold = Number(days)
+  const [productsRes, salesRes] = await Promise.all([
+    client.query(ref("products:list"), { limit: 99999 }),
+    client.query(ref("sales:list"), { limit: 99999 }),
+  ])
+  const products = productsRes.data || []
+  const sales = salesRes.data || []
+
+  const cutoff = new Date()
+  cutoff.setDate(cutoff.getDate() - threshold)
+
+  const soldProductIds = new Set()
+  for (const sale of sales) {
+    if (new Date(sale.createdAt) >= cutoff) {
+      for (const item of sale.items || []) {
+        soldProductIds.add(item.productId)
+      }
+    }
+  }
+
+  const slowMovers = products
+    .filter((p) => !soldProductIds.has(p._id) && p.stock > 0)
+    .map((p) => ({
+      productId: p._id,
+      productName: p.name,
+      sku: p.sku,
+      stock: p.stock,
+      price: p.price,
+      cost: p.cost,
+      value: p.price * p.stock,
+      daysWithoutSale: threshold,
+      category: p.category,
+    }))
+    .sort((a, b) => b.value - a.value)
+
+  const deadStock = slowMovers.filter((p) => p.stock > 0)
+  const totalValue = deadStock.reduce((s, p) => s + p.value, 0)
+
+  res.json({ slowMovers, totalValue, totalItems: deadStock.length, thresholdDays: threshold })
+}
+
+
