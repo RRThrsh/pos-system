@@ -13,6 +13,7 @@ import type * as categories from "../categories.js";
 import type * as config from "../config.js";
 import type * as expenses from "../expenses.js";
 import type * as inventory from "../inventory.js";
+import type * as notifications from "../notifications.js";
 import type * as permissions from "../permissions.js";
 import type * as products from "../products.js";
 import type * as promoCodes from "../promoCodes.js";
@@ -20,6 +21,7 @@ import type * as purchaseOrders from "../purchaseOrders.js";
 import type * as sales from "../sales.js";
 import type * as supplierProducts from "../supplierProducts.js";
 import type * as suppliers from "../suppliers.js";
+import type * as tables from "../tables.js";
 import type * as users from "../users.js";
 
 import type {
@@ -34,6 +36,7 @@ declare const fullApi: ApiFromModules<{
   config: typeof config;
   expenses: typeof expenses;
   inventory: typeof inventory;
+  notifications: typeof notifications;
   permissions: typeof permissions;
   products: typeof products;
   promoCodes: typeof promoCodes;
@@ -41,6 +44,7 @@ declare const fullApi: ApiFromModules<{
   sales: typeof sales;
   supplierProducts: typeof supplierProducts;
   suppliers: typeof suppliers;
+  tables: typeof tables;
   users: typeof users;
 }>;
 
