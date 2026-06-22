@@ -47,6 +47,7 @@ export const create = mutation({
     barcode: v.optional(v.string()),
     unitValue: v.optional(v.number()),
     unit: v.optional(v.string()),
+    image: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const existing = await ctx.db.query("products").withIndex("by_sku", (q) => q.eq("sku", args.sku)).first()
@@ -63,6 +64,7 @@ export const create = mutation({
       barcode: args.barcode ?? "",
       unitValue: args.unitValue,
       unit: args.unit,
+      image: args.image,
       createdAt: now,
       updatedAt: now,
     })
@@ -81,6 +83,7 @@ export const update = mutation({
     barcode: v.optional(v.string()),
     unitValue: v.optional(v.number()),
     unit: v.optional(v.string()),
+    image: v.optional(v.string()),
   },
   handler: async (ctx, { id, ...fields }) => {
     const existing = await ctx.db.get(id)
