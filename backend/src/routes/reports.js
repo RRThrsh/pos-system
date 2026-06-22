@@ -13,5 +13,6 @@ router.get('/daily-summaries', authenticate, authorize('admin', 'superadmin'), c
 router.get('/payment-methods', authenticate, authorize('admin', 'superadmin'), checkPermission('Reports', 'read'), reportController.paymentMethods)
 router.get('/hourly-sales', authenticate, authorize('admin', 'superadmin'), checkPermission('Reports', 'read'), reportController.hourlySales)
 router.get('/active-users', authenticate, authorize('admin', 'superadmin'), checkPermission('Reports', 'read'), reportController.activeUsersToday)
+router.get('/category-sales', authenticate, authorize('admin', 'superadmin'), checkPermission('Reports', 'read'), reportController.categorySales)
 
 module.exports = router
