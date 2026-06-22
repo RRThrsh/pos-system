@@ -27,6 +27,7 @@ export default defineSchema({
     barcode: v.string(),
     unitValue: v.optional(v.number()),
     unit: v.optional(v.string()),
+    image: v.optional(v.string()),
     createdAt: v.string(),
     updatedAt: v.string(),
   }).index("by_sku", ["sku"]),
@@ -42,7 +43,11 @@ export default defineSchema({
     total: v.number(),
     discount: v.number(),
     discountType: v.optional(v.string()),
+    tax: v.optional(v.number()),
+    taxRate: v.optional(v.number()),
+    promoCode: v.optional(v.string()),
     orderType: v.string(),
+    tableId: v.optional(v.string()),
     transactionId: v.optional(v.string()),
     paymentMethod: v.string(),
     amountPaid: v.number(),
@@ -137,6 +142,26 @@ export default defineSchema({
     createdBy: v.optional(v.id("users")),
     createdAt: v.string(),
   }).index("by_code", ["code"]),
+
+  tables: defineTable({
+    number: v.string(),
+    floor: v.string(),
+    capacity: v.number(),
+    status: v.union(v.literal("available"), v.literal("occupied"), v.literal("reserved"), v.literal("maintenance")),
+    currentSaleId: v.optional(v.id("sales")),
+    createdAt: v.string(),
+    updatedAt: v.string(),
+  }),
+
+  notifications: defineTable({
+    type: v.string(),
+    title: v.string(),
+    message: v.string(),
+    link: v.optional(v.string()),
+    read: v.boolean(),
+    userId: v.optional(v.id("users")),
+    createdAt: v.string(),
+  }).index("by_read", ["read"]).index("by_user", ["userId"]),
 
   supplierProducts: defineTable({
     supplierId: v.id("suppliers"),
