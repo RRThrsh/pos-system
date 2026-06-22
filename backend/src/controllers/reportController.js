@@ -53,20 +53,68 @@ exports.summary = async (req, res) => {
 
   const today = new Date()
   today.setHours(0, 0, 0, 0)
+
+  const yesterday = new Date(today)
+  yesterday.setDate(yesterday.getDate() - 1)
+
   const todaySales = salesData.filter((s) => new Date(s.createdAt) >= today)
+  const yesterdaySales = salesData.filter((s) => {
+    const d = new Date(s.createdAt)
+    return d >= yesterday && d < today
+  })
+
   const todayRevenue = todaySales.reduce((sum, s) => sum + s.total, 0)
+  const yesterdayRevenue = yesterdaySales.reduce((sum, s) => sum + s.total, 0)
   const totalRevenue = salesData.reduce((sum, s) => sum + s.total, 0)
   const lowStockCount = productsData.filter((p) => p.stock <= 10).length
+  const voidedCount = salesData.filter((s) => s.status === "voided").length
+  const todayVoidedCount = todaySales.filter((s) => s.status === "voided").length
+  const todayDiscAmount = todaySales.reduce((sum, s) => sum + (s.discount || 0), 0)
+  const todayItems = todaySales.reduce((sum, s) => sum + (s.items || []).reduce((a, i) => a + (i.qty || i.quantity || 0), 0), 0)
+  const invValue = productsData.reduce((sum, p) => sum + p.price * p.stock, 0)
 
   res.json({
     todaySales: todaySales.length,
     todayRevenue,
+    yesterdaySales: yesterdaySales.length,
+    yesterdayRevenue,
     totalSales: allSales.total,
     totalRevenue,
     totalProducts: allProducts.total,
     lowStockCount,
     totalUsers: users.length,
+    voidedCount,
+    todayVoidedCount,
+    todayDiscAmount,
+    todayItems,
+    inventoryValue: invValue,
   })
+}
+
+exports.categorySales = async (req, res) => {
+  const { period = "daily", date } = req.query
+  const [salesRes, productsRes] = await Promise.all([
+    client.query(ref("sales:list"), { limit: 99999 }),
+    client.query(ref("products:list"), { limit: 99999 }),
+  ])
+
+  const productMap = {}
+  for (const p of productsRes.data) {
+    productMap[p._id] = p.category || "Uncategorized"
+  }
+
+  const filtered = filterByPeriod(salesRes.data, period, date)
+  const catMap = {}
+  for (const sale of filtered) {
+    for (const item of sale.items || []) {
+      const cat = productMap[item.productId] || "Uncategorized"
+      if (!catMap[cat]) catMap[cat] = { category: cat, revenue: 0, count: 0 }
+      catMap[cat].revenue += item.total || (item.price * (item.qty || item.quantity || 0))
+      catMap[cat].count += item.qty || item.quantity || 0
+    }
+  }
+
+  res.json({ categories: Object.values(catMap).sort((a, b) => b.revenue - a.revenue) })
 }
 
 exports.bestSellers = async (req, res) => {
