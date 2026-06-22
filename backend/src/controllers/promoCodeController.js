@@ -27,6 +27,19 @@ exports.toggleActive = async (req, res) => {
   res.json(updated)
 }
 
+exports.validate = async (req, res) => {
+  const { code, subtotal } = req.body
+  if (!code) return res.status(400).json({ message: "Code is required" })
+  const promo = await client.query(ref("promoCodes:getByCode"), { code: code.toUpperCase() })
+  if (!promo) return res.status(404).json({ message: "Promo code not found" })
+  if (!promo.isActive) return res.status(400).json({ message: "Promo code is inactive" })
+  if (promo.expiresAt && new Date(promo.expiresAt) < new Date()) return res.status(400).json({ message: "Promo code has expired" })
+  if (promo.maxUses && promo.useCount >= promo.maxUses) return res.status(400).json({ message: "Promo code usage limit reached" })
+  if (subtotal && promo.minPurchase && Number(subtotal) < promo.minPurchase) return res.status(400).json({ message: `Minimum purchase of ₱${promo.minPurchase} required` })
+  const discount = promo.discountType === "percentage" ? Number(subtotal || 0) * (promo.discountValue / 100) : promo.discountValue
+  res.json({ valid: true, promo, discount })
+}
+
 exports.remove = async (req, res) => {
   await client.mutation(ref("promoCodes:remove"), { id: req.params.id })
   await audit.log("delete_promo_code", req, { details: `Deleted promo code ${req.params.id}` })
