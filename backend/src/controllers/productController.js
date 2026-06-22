@@ -19,7 +19,7 @@ exports.getById = async (req, res) => {
 }
 
 exports.create = async (req, res) => {
-  const { name, sku, price, cost, category, stock, barcode, unitValue, unit } = req.body
+  const { name, sku, price, cost, category, stock, barcode, unitValue, unit, image } = req.body
   if (!name || !sku || price === undefined) {
     return res.status(400).json({ message: "Name, SKU, and price are required." })
   }
@@ -35,6 +35,7 @@ exports.create = async (req, res) => {
       barcode: barcode || "",
       unitValue: unitValue !== undefined ? Number(unitValue) : undefined,
       unit: unit || undefined,
+      image: image || undefined,
     })
     const product = await client.query(ref("products:getById"), { id })
     await audit.log("create_product", req, { details: `Created product: ${product.name} (${product.sku})`, itemName: product.name })
@@ -68,6 +69,26 @@ exports.update = async (req, res) => {
     }
     throw error
   }
+}
+
+exports.bulkImport = async (req, res) => {
+  const { products } = req.body
+  if (!Array.isArray(products) || products.length === 0) return res.status(400).json({ message: "Products array is required" })
+  const results = { created: 0, errors: [] }
+  for (const p of products) {
+    if (!p.name || !p.sku) { results.errors.push({ row: p, error: "Name and SKU required" }); continue }
+    try {
+      await client.mutation(ref("products:create"), {
+        name: p.name, sku: p.sku, price: Number(p.price || 0), cost: Number(p.cost || 0),
+        category: p.category || "Uncategorized", stock: Number(p.stock || 0),
+        barcode: p.barcode || "", unitValue: p.unitValue ? Number(p.unitValue) : undefined,
+        unit: p.unit || undefined, image: p.image || undefined,
+      })
+      results.created++
+    } catch (e) { results.errors.push({ row: p, error: e.message }) }
+  }
+  await audit.log("bulk_import_products", req, { details: `Imported ${results.created} products, ${results.errors.length} errors`, itemName: `${results.created} products` })
+  res.json(results)
 }
 
 exports.remove = async (req, res) => {
