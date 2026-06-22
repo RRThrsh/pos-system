@@ -113,6 +113,7 @@ export const reportsApi = {
   paymentMethods: (params) => request(`/reports/payment-methods?${new URLSearchParams(params)}`),
   hourlySales: (params) => request(`/reports/hourly-sales?${new URLSearchParams(params)}`),
   activeUsers: () => request('/reports/active-users'),
+  categorySales: (params) => request(`/reports/category-sales?${new URLSearchParams(params)}`),
 }
 
 export const configApi = {
