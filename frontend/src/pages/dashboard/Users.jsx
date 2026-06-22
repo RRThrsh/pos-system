@@ -30,13 +30,20 @@ function Users() {
 
   const openCreate = () => { setEditing(null); setForm(emptyForm); setModalOpen(true) }
 
+  const isSelf = (item) => item._id === currentUser?.id
+
   const openEdit = (item) => {
+    if (currentUser?.role !== 'superadmin' && item.role === 'superadmin') {
+      addToast('You cannot edit a superadmin account.', 'error')
+      return
+    }
     setEditing(item)
     setForm({
       firstName: item.firstName || '',
       lastName: item.lastName || '',
       username: item.username || '',
       password: '',
+      currentPassword: '',
       role: item.role || 'cashier',
     })
     setModalOpen(true)
@@ -57,9 +64,14 @@ function Users() {
       addToast('Password is required.', 'error')
       return
     }
+    if (editing && isSelf(editing) && form.password && !form.currentPassword) {
+      addToast('Current password is required to set a new password.', 'error')
+      return
+    }
     try {
       const payload = { ...form, ...trimmed }
-      if (editing && !payload.password) delete payload.password
+      if (editing && !payload.password) { delete payload.password; delete payload.currentPassword }
+      if (editing && payload.password && !isSelf(editing)) delete payload.currentPassword
       if (editing) {
         await usersApi.update(editing._id || editing.id, payload)
         addToast('User updated', 'success')
@@ -77,8 +89,12 @@ function Users() {
   const superadminCount = items.filter((u) => u.role === 'superadmin').length
 
   const handleDelete = async (id, item) => {
-    if (item._id === currentUser?._id || item.id === currentUser?.id) {
+    if (item._id === currentUser?.id) {
       addToast('You cannot delete your own account.', 'error')
+      return
+    }
+    if (currentUser?.role !== 'superadmin' && item.role === 'superadmin') {
+      addToast('You cannot delete a superadmin account.', 'error')
       return
     }
     if (item.role === 'superadmin' && superadminCount <= 1) {
@@ -125,7 +141,7 @@ function Users() {
                     </span>
                   </td>
                   <td className="px-4 py-3 text-center">
-                    {(currentUser?.role === 'superadmin') && (
+                    {(currentUser?.role === 'superadmin' || currentUser?.role === 'admin') && (
                       <div className="flex items-center justify-center gap-3">
                         <button onClick={() => openEdit(item)} className="inline-flex items-center gap-1 text-indigo-600 hover:text-indigo-800 text-sm font-medium">
                           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
@@ -134,7 +150,7 @@ function Users() {
                           Edit
                         </button>
                         {(() => {
-                          const isSelf = item._id === currentUser?._id || item.id === currentUser?.id
+                          const isSelf = item._id === currentUser?.id
                           const isLastSuperadmin = item.role === 'superadmin' && superadminCount <= 1
                           const disabled = isSelf || isLastSuperadmin
                           return (
@@ -184,13 +200,23 @@ function Users() {
             <label className="block text-sm font-medium text-gray-700 mb-1">{editing ? 'New Password (leave blank to keep)' : 'Password'}</label>
             <input type="password" required={!editing} value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20" />
           </div>
+          {editing && isSelf(editing) && form.password && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Current Password</label>
+              <input type="password" required value={form.currentPassword} onChange={(e) => setForm({ ...form, currentPassword: e.target.value })} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20" />
+            </div>
+          )}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Role</label>
-            <select value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20">
-              <option value="cashier">Cashier</option>
-              <option value="admin">Admin</option>
-              <option value="superadmin">Superadmin</option>
-            </select>
+            {editing && editing._id === currentUser?.id ? (
+              <input type="text" value={form.role} disabled className="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-500 capitalize cursor-not-allowed" />
+            ) : (
+              <select value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20">
+                <option value="cashier">Cashier</option>
+                <option value="admin">Admin</option>
+                {(currentUser?.role === 'superadmin') && <option value="superadmin">Superadmin</option>}
+              </select>
+            )}
           </div>
           <div className="flex justify-end gap-3 pt-2">
             <button type="button" onClick={() => setModalOpen(false)} className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800">Cancel</button>

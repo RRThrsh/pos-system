@@ -1,12 +1,14 @@
 import { useState, useEffect } from 'react'
-import { inventoryApi, productsApi } from '../../services/api.js'
+import { inventoryApi, productsApi, downloadCSV } from '../../services/api.js'
 import Modal from '../../components/Modal.jsx'
 import Spinner from '../../components/Spinner.jsx'
 import Pagination, { PAGE_SIZE } from '../../components/Pagination.jsx'
 import { useToast } from '../../context/ToastContext.jsx'
+import { usePermission } from '../../hooks/usePermission.js'
 
 function Inventory() {
   const { addToast } = useToast()
+  const { canWrite } = usePermission('Inventory')
   const [movements, setMovements] = useState([])
   const [products, setProducts] = useState([])
   const [loading, setLoading] = useState(true)
@@ -73,10 +75,14 @@ function Inventory() {
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
-        <input type="text" placeholder="Search products..." value={search}
-          onChange={(e) => { setSearch(e.target.value); setStockPage(1) }}
-          className="w-full max-w-xs rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20" />
-        <button onClick={() => setModalOpen(true)} className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-indigo-500 transition-colors">+ Adjust Stock</button>
+        <div className="flex items-center gap-2">
+          <input type="text" placeholder="Search products..." value={search}
+            onChange={(e) => { setSearch(e.target.value); setStockPage(1) }}
+            className="w-full max-w-xs rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20" />
+          {tab === 'stock' && <button onClick={() => downloadCSV(['name', 'sku', 'stock', 'category'], filteredStock, `inventory-stock-${new Date().toISOString().slice(0, 10)}.csv`)} className="border border-gray-300 text-gray-600 px-4 py-2 rounded-lg text-sm hover:bg-gray-50 min-w-[120px]">Export CSV</button>}
+          {tab === 'movements' && <button onClick={() => downloadCSV(['productName', 'type', 'quantity', 'reason', 'date'], sortedMovements, `inventory-movements-${new Date().toISOString().slice(0, 10)}.csv`)} className="border border-gray-300 text-gray-600 px-4 py-2 rounded-lg text-sm hover:bg-gray-50 min-w-[120px]">Export CSV</button>}
+        </div>
+        {canWrite && <button onClick={() => setModalOpen(true)} className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-indigo-500 transition-colors">+ Adjust Stock</button>}
       </div>
 
       <div className="flex gap-1 mb-6 bg-gray-100 rounded-lg p-1 w-fit">
@@ -116,13 +122,13 @@ function Inventory() {
                       <td className="px-4 py-3 text-gray-600">{p.sku}</td>
                       <td className="px-4 py-3 text-gray-600">{p.category}</td>
                       <td className="px-4 py-3 text-right">&#8369;{Number(p.price).toLocaleString()}</td>
-                      <td className={`px-4 py-3 text-right font-medium ${p.stock <= 5 ? 'text-red-600' : p.stock <= 10 ? 'text-yellow-600' : 'text-gray-900'}`}>{p.stock}</td>
+                      <td className={`px-4 py-3 text-right font-medium ${p.stock <= 0 ? 'text-red-600 font-bold' : p.reorderPoint && p.stock <= p.reorderPoint ? 'text-orange-600 font-bold' : p.stock <= 5 ? 'text-yellow-600' : 'text-gray-900'}`}>{p.stock}</td>
                       <td className="px-4 py-3 text-right">
                         {p.stock === 0 ? (
                           <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">Out of Stock</span>
+                        ) : p.reorderPoint && p.stock <= p.reorderPoint ? (
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-800">Reorder</span>
                         ) : p.stock <= 5 ? (
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">Critical</span>
-                        ) : p.stock <= 10 ? (
                           <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">Low</span>
                         ) : (
                           <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">In Stock</span>

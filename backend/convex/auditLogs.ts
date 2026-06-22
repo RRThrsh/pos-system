@@ -27,6 +27,15 @@ export const list = query({
   },
 })
 
+export const clearAll = mutation({
+  handler: async (ctx) => {
+    const logs = await ctx.db.query("auditLogs").collect()
+    for (const log of logs) {
+      await ctx.db.delete(log._id)
+    }
+  },
+})
+
 export const create = mutation({
   args: {
     userId: v.optional(v.string()),

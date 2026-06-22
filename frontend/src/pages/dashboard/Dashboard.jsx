@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { reportsApi, salesApi, productsApi, auditLogsApi } from '../../services/api.js'
 import Spinner from '../../components/Spinner.jsx'
 import {
@@ -46,16 +46,17 @@ function Dashboard() {
   const [bestSellers, setBestSellers] = useState([])
   const [activeUsers, setActiveUsers] = useState([])
   const [recentActivity, setRecentActivity] = useState([])
+  const [categorySales, setCategorySales] = useState([])
+  const [lowStockItems, setLowStockItems] = useState([])
+  const initialLoad = useRef(true)
 
-  useEffect(() => {
-    setLoading(true)
-
+  const loadAll = () => {
     const now = new Date()
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
     const prevMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString()
     const prevMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59).toISOString()
 
-    Promise.all([
+    return Promise.all([
       reportsApi.summary(),
       reportsApi.dailySummaries({ period: chartPeriod }),
       salesApi.getAll({ limit: '5' }),
@@ -67,27 +68,42 @@ function Dashboard() {
       reportsApi.bestSellers({ period: chartPeriod, limit: '5' }),
       reportsApi.activeUsers(),
       auditLogsApi.getAll({ limit: '10' }),
-    ])
-      .then(([
-        summaryData, dailyRes, salesData, prodData,
-        profitsRes, prevProfitsRes, pmRes, hourlyRes, bestRes, activeRes, activityRes,
-      ]) => {
-        setSummary(summaryData)
-        setDailyData(dailyRes.dailySummaries || [])
-        setRecentSales(salesData.data || salesData.sales || salesData || [])
-        const allProducts = prodData.products || prodData.data || prodData || []
-        setLowStock(allProducts.filter((p) => p.stock <= 10))
-        setZeroStock(allProducts.filter((p) => p.stock === 0))
-        setProfitData(profitsRes)
-        setPrevProfit(prevProfitsRes)
-        setPaymentMethods(pmRes.paymentMethods || [])
-        setHourlySales(hourlyRes.hourlySales || [])
-        setBestSellers(bestRes.bestSellers || [])
-        setActiveUsers(activeRes.users || [])
-        setRecentActivity((activityRes.data || []).slice(0, 10))
-      })
+      reportsApi.categorySales({ period: chartPeriod }),
+      reportsApi.inventory(),
+    ]).then(([
+      summaryData, dailyRes, salesData, prodData,
+      profitsRes, prevProfitsRes, pmRes, hourlyRes, bestRes, activeRes, activityRes,
+      catRes, invRes,
+    ]) => {
+      setSummary(summaryData)
+      setDailyData(dailyRes.dailySummaries || [])
+      setRecentSales(salesData.data || salesData.sales || salesData || [])
+      const allProducts = prodData.products || prodData.data || prodData || []
+      setLowStock(allProducts.filter((p) => p.stock <= 10))
+      setZeroStock(allProducts.filter((p) => p.stock === 0))
+      setProfitData(profitsRes)
+      setPrevProfit(prevProfitsRes)
+      setPaymentMethods(pmRes.paymentMethods || [])
+      setHourlySales(hourlyRes.hourlySales || [])
+      setBestSellers(bestRes.bestSellers || [])
+      setActiveUsers(activeRes.users || [])
+      setRecentActivity((activityRes.data || []).slice(0, 10))
+      setCategorySales(catRes.categories || [])
+      setLowStockItems((invRes.lowStock || []).filter((p) => p.stock > 0 && p.stock <= 10))
+    })
+  }
+
+  useEffect(() => {
+    loadAll()
       .catch((err) => setError(err.message || 'Failed to load data'))
       .finally(() => setLoading(false))
+  }, [])
+
+  useEffect(() => {
+    if (!initialLoad.current) {
+      loadAll().catch((err) => setError(err.message || 'Failed to load data'))
+    }
+    initialLoad.current = false
   }, [chartPeriod])
 
   const formatDate = (d) => {
@@ -114,9 +130,15 @@ function Dashboard() {
     : null
   const activeCount = activeUsers.length
 
+  const dodSales = summary?.yesterdaySales > 0 ? ((summary.todaySales - summary.yesterdaySales) / summary.yesterdaySales) * 100 : null
+  const dodRevenue = summary?.yesterdayRevenue > 0 ? ((summary.todayRevenue - summary.yesterdayRevenue) / summary.yesterdayRevenue) * 100 : null
+  const returnRate = summary?.totalSales > 0 ? ((summary.voidedCount || 0) / summary.totalSales) * 100 : 0
+  const invValue = summary?.inventoryValue || 0
+  const lowStockCount = summary?.lowStockCount || 0
+
   const mainCards = [
-    { key: 'todaySales', label: 'Today Sales', icon: 'todaySales', color: 'from-blue-500 to-blue-600' },
-    { key: 'todayRevenue', label: "Today's Revenue", prefix: '₱', icon: 'todayRevenue', color: 'from-emerald-500 to-emerald-600' },
+    { key: 'todaySales', label: 'Today Sales', icon: 'todaySales', color: 'from-blue-500 to-blue-600', dod: dodSales },
+    { key: 'todayRevenue', label: "Today's Revenue", prefix: '₱', icon: 'todayRevenue', color: 'from-emerald-500 to-emerald-600', dod: dodRevenue },
     { key: 'totalRevenue', label: 'Total Revenue', prefix: '₱', icon: 'totalRevenue', color: 'from-teal-500 to-teal-600' },
     { key: 'totalSales', label: 'Total Sales', icon: 'totalSales', color: 'from-indigo-500 to-indigo-600' },
   ]
@@ -124,8 +146,15 @@ function Dashboard() {
   const metricCards = [
     { label: 'Net Profit', value: netProfit, prefix: '₱', icon: 'netProfit', color: 'from-violet-500 to-violet-600' },
     { label: 'Avg Order Value', value: avgOrder, prefix: '₱', icon: 'avgOrder', color: 'from-cyan-500 to-cyan-600' },
-    { label: 'MoM Growth', value: momGrowth, suffix: '%', icon: 'momGrowth', color: momGrowth >= 0 ? 'from-green-500 to-green-600' : 'from-red-500 to-red-600' },
+    { label: 'Return Rate', value: returnRate, suffix: '%', icon: 'momGrowth', color: returnRate <= 5 ? 'from-green-500 to-green-600' : 'from-red-500 to-red-600' },
     { label: 'Active Users Today', value: activeCount, icon: 'activeUsers', color: 'from-amber-500 to-amber-600' },
+  ]
+
+  const bottomCards = [
+    { label: 'MoM Growth', value: momGrowth, suffix: '%', icon: 'momGrowth', color: momGrowth >= 0 ? 'from-green-500 to-green-600' : 'from-red-500 to-red-600' },
+    { label: 'Inventory Value', value: invValue, prefix: '₱', icon: 'totalProducts', color: 'from-indigo-500 to-indigo-600' },
+    { label: 'Low Stock Items', value: lowStockCount, icon: 'lowStockCount', color: lowStockCount > 0 ? 'from-orange-500 to-orange-600' : 'from-green-500 to-green-600' },
+    { label: 'Discount Impact Today', value: summary?.todayDiscAmount || 0, prefix: '₱', icon: 'avgOrder', color: 'from-rose-500 to-rose-600' },
   ]
 
   if (loading) {
@@ -159,8 +188,15 @@ function Dashboard() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={icons[card.icon]} />
                 </svg>
               </div>
-              <p className="text-2xl font-bold text-gray-800">{display}</p>
-              <p className="text-sm text-gray-400 mt-0.5">{card.label}</p>
+              <div className="flex items-center gap-2">
+                <p className="text-2xl font-bold text-gray-800">{display}</p>
+                {card.dod !== undefined && card.dod !== null && (
+                  <span className={`text-xs font-medium ${card.dod >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    {card.dod >= 0 ? '+' : ''}{card.dod.toFixed(1)}%
+                  </span>
+                )}
+              </div>
+              <p className="text-sm text-gray-500 mt-0.5">{card.label}</p>
             </div>
           )
         })}
@@ -179,14 +215,45 @@ function Dashboard() {
           }
 
           return (
-            <div key={card.label} className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 hover:shadow-md transition-shadow">
-              <div className={`w-11 h-11 rounded-xl bg-gradient-to-br ${card.color} flex items-center justify-center mb-3 shadow-sm`}>
-                <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={icons[card.icon]} />
+            <div key={card.label} className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 hover:shadow-md transition-shadow">
+              <div className="flex items-center gap-3">
+                <div className={`w-9 h-9 rounded-lg bg-gradient-to-br ${card.color} flex items-center justify-center shrink-0 shadow-sm`}>
+                  <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={icons[card.icon]} />
+                  </svg>
+                </div>
+                <div className="min-w-0">
+                  <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">{card.label}</p>
+                  <p className={`text-xl font-bold ${card.suffix === '%' && card.value < 0 ? 'text-red-600' : 'text-gray-800'} truncate`}>{display}</p>
+                </div>
+              </div>
+            </div>
+          )
+        })}
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {bottomCards.map((card) => {
+          let display
+          if (card.suffix === '%') {
+            const v = card.value
+            display = v !== null ? `${v >= 0 ? '+' : ''}${v.toFixed(1)}%` : 'N/A'
+          } else if (card.prefix) {
+            display = formatCurrency(card.value)
+          } else {
+            display = Number(card.value || 0).toLocaleString()
+          }
+          return (
+            <div key={card.label} className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 hover:shadow-md transition-shadow">
+              <div className="flex items-center justify-between">
+                <div className="min-w-0">
+                  <p className="text-xs text-gray-500">{card.label}</p>
+                  <p className={`text-lg font-semibold mt-0.5 ${card.suffix === '%' && card.value < 0 ? 'text-red-600' : 'text-gray-800'}`}>{display}</p>
+                </div>
+                <svg className="w-5 h-5 text-gray-300 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d={icons[card.icon]} />
                 </svg>
               </div>
-              <p className={`text-2xl font-bold ${card.suffix === '%' && card.value < 0 ? 'text-red-600' : 'text-gray-800'}`}>{display}</p>
-              <p className="text-sm text-gray-400 mt-0.5">{card.label}</p>
             </div>
           )
         })}
@@ -211,9 +278,9 @@ function Dashboard() {
             </div>
           </div>
           {dailyData.length === 0 ? (
-            <p className="text-sm text-gray-400 text-center py-12">No sales data for this period.</p>
+            <p className="text-sm text-gray-500 text-center py-12">No sales data for this period.</p>
           ) : (
-            <ResponsiveContainer width="100%" height={220}>
+            <ResponsiveContainer width="100%" height={260}>
               <LineChart data={dailyData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                 <XAxis dataKey="date" tick={{ fontSize: 11 }} tickFormatter={formatShort} />
@@ -229,9 +296,9 @@ function Dashboard() {
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
           <h2 className="text-lg font-semibold text-gray-800 mb-4">Sales by Payment</h2>
           {paymentMethods.length === 0 ? (
-            <p className="text-sm text-gray-400 text-center py-12">No data.</p>
+            <p className="text-sm text-gray-500 text-center py-12">No data.</p>
           ) : (
-            <ResponsiveContainer width="100%" height={260}>
+            <ResponsiveContainer width="100%" height={220}>
               <PieChart>
                 <Pie data={paymentMethods} dataKey="revenue" nameKey="method" cx="50%" cy="50%" innerRadius={55} outerRadius={85} paddingAngle={3}>
                   {paymentMethods.map((_, i) => (
@@ -244,15 +311,39 @@ function Dashboard() {
             </ResponsiveContainer>
           )}
         </div>
+
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+          <h2 className="text-lg font-semibold text-gray-800 mb-4">Top Categories</h2>
+          {categorySales.length === 0 ? (
+            <p className="text-sm text-gray-500 text-center py-12">No data.</p>
+          ) : (
+            <div className="space-y-3">
+              {categorySales.slice(0, 7).map((cat, i) => {
+                const maxRev = Math.max(...categorySales.map((c) => c.revenue), 1)
+                return (
+                  <div key={cat.category}>
+                    <div className="flex items-center justify-between text-sm mb-1">
+                      <span className="text-gray-700 truncate flex-1">{i + 1}. {cat.category}</span>
+                      <span className="text-gray-500 ml-2">{formatCurrency(cat.revenue)}</span>
+                    </div>
+                    <div className="w-full bg-gray-100 rounded-full h-2">
+                      <div className="bg-teal-500 h-2 rounded-full" style={{ width: `${(cat.revenue / maxRev) * 100}%` }} />
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
           <h2 className="text-lg font-semibold text-gray-800 mb-4">Revenue vs Cost</h2>
           {!profitData ? (
-            <p className="text-sm text-gray-400 text-center py-12">No data.</p>
+            <p className="text-sm text-gray-500 text-center py-12">No data.</p>
           ) : (
-            <div className="space-y-6">
+            <div className="space-y-4">
               <div className="flex items-center justify-between text-sm">
                 <span className="text-gray-500">Revenue</span>
                 <span className="font-semibold text-gray-800">{formatCurrency(profitData.revenue)}</span>
@@ -261,23 +352,25 @@ function Dashboard() {
                 <span className="text-gray-500">Cost</span>
                 <span className="font-semibold text-red-600">{formatCurrency(profitData.cost)}</span>
               </div>
-              <div className="border-t border-gray-100 pt-4 flex items-center justify-between text-sm">
+              <div className="border-t border-gray-100 pt-3 flex items-center justify-between">
                 <span className="font-medium text-gray-700">Profit</span>
                 <span className={`font-bold text-lg ${netProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>{formatCurrency(netProfit)}</span>
               </div>
-              <div className="w-full bg-gray-100 rounded-full h-2.5">
-                <div
-                  className="bg-blue-500 h-2.5 rounded-full"
-                  style={{ width: `${Math.min((profitData.revenue / (profitData.revenue || 1)) * 100, 100)}%` }}
-                />
+              <div className="w-full bg-gray-100 rounded-full h-3 flex overflow-hidden">
+                <div className="bg-blue-500 h-full transition-all" style={{ width: `${Math.max(0, 100 - (profitData.cost / (profitData.revenue || 1)) * 100)}%` }} />
+                <div className="bg-red-400 h-full transition-all" style={{ width: `${Math.min(100, (profitData.cost / (profitData.revenue || 1)) * 100)}%` }} />
               </div>
-              <div className="w-full bg-gray-100 rounded-full h-2.5">
-                <div
-                  className="bg-red-400 h-2.5 rounded-full"
-                  style={{ width: `${Math.min((profitData.cost / (profitData.revenue || 1)) * 100, 100)}%` }}
-                />
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-blue-500" />
+                  <span className="text-xs text-gray-500">Margin</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-red-400" />
+                  <span className="text-xs text-gray-500">Cost</span>
+                </div>
+                <span className="text-xs font-medium text-gray-600">{profitData.revenue ? ((netProfit / profitData.revenue) * 100).toFixed(1) : 0}% margin</span>
               </div>
-              <p className="text-xs text-gray-400 text-center">Profit margin: {profitData.revenue ? ((netProfit / profitData.revenue) * 100).toFixed(1) : 0}%</p>
             </div>
           )}
         </div>
@@ -285,7 +378,7 @@ function Dashboard() {
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
           <h2 className="text-lg font-semibold text-gray-800 mb-4">Top 5 Products</h2>
           {bestSellers.length === 0 ? (
-            <p className="text-sm text-gray-400 text-center py-12">No data.</p>
+            <p className="text-sm text-gray-500 text-center py-12">No data.</p>
           ) : (
             <div className="space-y-3">
               {bestSellers.map((p, i) => {
@@ -309,7 +402,7 @@ function Dashboard() {
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
           <h2 className="text-lg font-semibold text-gray-800 mb-4">Hourly Sales</h2>
           {hourlySales.length === 0 ? (
-            <p className="text-sm text-gray-400 text-center py-12">No data.</p>
+            <p className="text-sm text-gray-500 text-center py-12">No data.</p>
           ) : (
             <ResponsiveContainer width="100%" height={220}>
               <BarChart data={hourlySales}>
@@ -328,7 +421,7 @@ function Dashboard() {
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
           <h2 className="text-lg font-semibold text-gray-800 mb-4">Recent User Activity</h2>
           {recentActivity.length === 0 ? (
-            <p className="text-sm text-gray-400 text-center py-6">No activity.</p>
+            <p className="text-sm text-gray-500 text-center py-6">No activity.</p>
           ) : (
             <div className="space-y-2 max-h-64 overflow-auto">
               {recentActivity.map((log) => (
@@ -337,8 +430,8 @@ function Dashboard() {
                     <span className={`w-2 h-2 rounded-full shrink-0 ${log.action?.includes('login') ? 'bg-green-400' : log.action?.includes('create') ? 'bg-blue-400' : log.action?.includes('void') ? 'bg-red-400' : 'bg-gray-400'}`} />
                     <span className="text-gray-700 truncate">{log.username}</span>
                   </div>
-                  <span className="text-gray-400 text-xs shrink-0 ml-2">{log.action}</span>
-                  <span className="text-gray-400 text-xs shrink-0 ml-2">{formatDate(log.createdAt)}</span>
+                  <span className="text-gray-500 text-xs shrink-0 ml-2">{log.action}</span>
+                  <span className="text-gray-500 text-xs shrink-0 ml-2">{formatDate(log.createdAt)}</span>
                 </div>
               ))}
             </div>
@@ -346,15 +439,27 @@ function Dashboard() {
         </div>
 
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
-          <h2 className="text-lg font-semibold text-gray-800 mb-4">Zero Stock Items</h2>
-          {zeroStock.length === 0 ? (
-            <p className="text-sm text-gray-400 text-center py-6">No zero-stock items.</p>
+          <h2 className="text-lg font-semibold text-gray-800 mb-4">Stock Alerts</h2>
+          {zeroStock.length === 0 && lowStockItems.length === 0 ? (
+            <p className="text-sm text-gray-500 text-center py-6">All items well-stocked.</p>
           ) : (
             <div className="space-y-2 max-h-64 overflow-auto">
               {zeroStock.map((p) => (
                 <div key={p._id || p.id} className="flex items-center justify-between text-sm py-1.5 border-b border-gray-50 last:border-0">
-                  <span className="text-gray-700 truncate flex-1">{p.name}</span>
-                  <span className="ml-2 font-medium text-red-600">0</span>
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="w-2 h-2 rounded-full bg-red-400 shrink-0" />
+                    <span className="text-gray-700 truncate">{p.name}</span>
+                  </div>
+                  <span className="text-xs font-medium text-red-600 shrink-0">Out of stock</span>
+                </div>
+              ))}
+              {lowStockItems.filter((p) => p.stock > 0).map((p) => (
+                <div key={p._id || p.id} className="flex items-center justify-between text-sm py-1.5 border-b border-gray-50 last:border-0">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="w-2 h-2 rounded-full bg-orange-400 shrink-0" />
+                    <span className="text-gray-700 truncate">{p.name}</span>
+                  </div>
+                  <span className="text-xs font-medium text-orange-500 shrink-0">{p.stock} remaining</span>
                 </div>
               ))}
             </div>
@@ -365,7 +470,7 @@ function Dashboard() {
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
         <h2 className="text-lg font-semibold text-gray-800 mb-4">Recent Transactions</h2>
         {recentSales.length === 0 ? (
-          <p className="text-sm text-gray-400 text-center py-6">No recent sales.</p>
+          <p className="text-sm text-gray-500 text-center py-6">No recent sales.</p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">

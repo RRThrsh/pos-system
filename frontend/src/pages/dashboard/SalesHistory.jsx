@@ -1,12 +1,14 @@
 import { useState, useEffect } from 'react'
-import { salesApi, productsApi } from '../../services/api.js'
+import { salesApi, productsApi, downloadCSV } from '../../services/api.js'
 import Modal from '../../components/Modal.jsx'
 import Spinner from '../../components/Spinner.jsx'
 import Pagination, { PAGE_SIZE } from '../../components/Pagination.jsx'
 import { useToast } from '../../context/ToastContext.jsx'
+import { usePermission } from '../../hooks/usePermission.js'
 
 function SalesHistory() {
   const { addToast } = useToast()
+  const { canExecute } = usePermission('Sales')
   const [items, setItems] = useState([])
   const [productMap, setProductMap] = useState({})
   const [loading, setLoading] = useState(true)
@@ -62,6 +64,9 @@ function SalesHistory() {
 
   return (
     <div>
+      <div className="flex justify-end mb-4">
+        <button onClick={() => downloadCSV(['date', 'transactionId', 'orderType', 'items', 'total', 'profit', 'payment', 'status'], items.map((s) => ({ date: s.createdAt, transactionId: s.transactionId, orderType: s.orderType, items: s.items?.reduce((a, i) => a + (i.qty || i.quantity || 0), 0), total: s.total, profit: calcProfit(s), payment: s.paymentMethod, status: s.status })), `sales-${new Date().toISOString().slice(0, 10)}.csv`)} className="border border-gray-300 text-gray-600 px-4 py-2 rounded-lg text-sm hover:bg-gray-50 min-w-[120px]">Export CSV</button>
+      </div>
 
       {loading ? <Spinner /> : (
         <div className="bg-white rounded-lg shadow overflow-x-auto">
@@ -96,7 +101,7 @@ function SalesHistory() {
                   </td>
                   <td className="px-4 py-3 text-center">
                     <button onClick={() => setViewItem(sale)} className="text-indigo-600 hover:text-indigo-800 mr-3">View</button>
-                    {sale.status !== 'voided' && (
+                    {sale.status !== 'voided' && canExecute && (
                       <button onClick={() => handleVoid(sale._id || sale.id)} className="text-red-600 hover:text-red-800">Void</button>
                     )}
                   </td>

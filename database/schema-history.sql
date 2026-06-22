@@ -146,3 +146,7 @@ CREATE INDEX idx_audit_createdAt ON audit_logs(createdAt);
 -- v6  - Added supplier_products table with price history tracking
 -- v7  - Replaced customerId with transactionId on sales table
 -- v8  - Added audit_logs table for user activity tracking
+-- v9  - Added config, permissions tables
+-- v10 - Added purchase_orders table for supplier ordering
+-- v11 - Added expenses table for operational expense tracking
+-- v12 - Added promo_codes table for reusable discount codes

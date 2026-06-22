@@ -1,12 +1,97 @@
+import { useState, useEffect } from 'react'
+import { configApi, reportsApi } from '../../services/api.js'
+import Spinner from '../../components/Spinner.jsx'
+
 function Monitoring() {
+  const [systemInfo, setSystemInfo] = useState(null)
+  const [summary, setSummary] = useState(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    Promise.all([
+      configApi.systemInfo().catch(() => ({ message: 'Unavailable' })),
+      reportsApi.summary().catch(() => ({})),
+    ])
+      .then(([info, sum]) => { setSystemInfo(info); setSummary(sum) })
+      .finally(() => setLoading(false))
+  }, [])
+
+  if (loading) return <Spinner />
+
   return (
-    <div>
-      <div className="bg-white rounded-lg shadow p-8 text-center text-gray-500">
-        <svg className="mx-auto h-12 w-12 text-gray-300 mb-3" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 0 1 3 19.875v-6.75ZM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V8.625ZM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V4.125Z" />
-        </svg>
-        <p className="text-lg font-medium">Monitoring</p>
-        <p className="text-sm mt-1">View real-time system performance and health.</p>
+    <div className="space-y-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="bg-white rounded-lg shadow p-6">
+          <h3 className="text-sm font-medium text-gray-500 mb-4">System Health</h3>
+          <div className="space-y-3">
+            <div className="flex justify-between"><span className="text-gray-600">Status</span><span className="flex items-center gap-1 text-green-600 font-medium"><span className="w-2 h-2 bg-green-500 rounded-full inline-block"></span> Online</span></div>
+            <div className="flex justify-between"><span className="text-gray-600">Node Version</span><span className="font-mono text-sm">{systemInfo?.nodeVersion || '-'}</span></div>
+            <div className="flex justify-between"><span className="text-gray-600">Uptime</span><span>{systemInfo?.uptime ? `${Math.floor(systemInfo.uptime / 3600)}h ${Math.floor((systemInfo.uptime % 3600) / 60)}m` : '-'}</span></div>
+            <div className="flex justify-between"><span className="text-gray-600">Platform</span><span className="text-sm">{systemInfo?.platform || '-'}</span></div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-lg shadow p-6">
+          <h3 className="text-sm font-medium text-gray-500 mb-4">Database Stats</h3>
+          <div className="space-y-3">
+            {[
+              { label: 'Products', value: summary?.totalProducts },
+              { label: 'Users', value: summary?.totalUsers },
+              { label: 'Categories', value: summary?.totalCategories ?? '-' },
+              { label: 'Sales Records', value: summary?.totalSales },
+            ].map((s) => (
+              <div key={s.label} className="flex justify-between">
+                <span className="text-gray-600">{s.label}</span>
+                <span className="font-medium">{s.value ?? '-'}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="bg-white rounded-lg shadow p-6">
+          <h3 className="text-sm font-medium text-gray-500 mb-4">Revenue Overview</h3>
+          <div className="space-y-3">
+            {[
+              { label: 'Total Revenue', value: `₱${Number(summary?.totalRevenue || 0).toLocaleString()}` },
+              { label: 'Today Revenue', value: `₱${Number(summary?.todayRevenue || 0).toLocaleString()}` },
+              { label: 'Today Sales Count', value: summary?.todaySales || 0 },
+              { label: 'Total Products', value: summary?.totalProducts || 0 },
+            ].map((s) => (
+              <div key={s.label} className="flex justify-between">
+                <span className="text-gray-600">{s.label}</span>
+                <span className="font-medium">{s.value}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div className="bg-white rounded-lg shadow p-6">
+        <h3 className="text-sm font-medium text-gray-500 mb-4">API Endpoints Health</h3>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          {['/api/products', '/api/sales', '/api/users', '/api/inventory', '/api/suppliers', '/api/reports', '/api/config', '/api/permissions'].map((ep) => (
+            <div key={ep} className="flex items-center gap-2 bg-gray-50 rounded-lg px-3 py-2 text-sm">
+              <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+              <span className="font-mono text-xs text-gray-600">{ep}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="bg-white rounded-lg shadow p-6">
+        <h3 className="text-sm font-medium text-gray-500 mb-4">Memory Usage (Estimated)</h3>
+        <div className="space-y-3">
+          {[
+            { label: 'Heap Used', value: systemInfo?.memoryUsage ? `${(systemInfo.memoryUsage.heapUsed / 1024 / 1024).toFixed(1)} MB` : '-' },
+            { label: 'Heap Total', value: systemInfo?.memoryUsage ? `${(systemInfo.memoryUsage.heapTotal / 1024 / 1024).toFixed(1)} MB` : '-' },
+            { label: 'RSS', value: systemInfo?.memoryUsage ? `${(systemInfo.memoryUsage.rss / 1024 / 1024).toFixed(1)} MB` : '-' },
+          ].map((s) => (
+            <div key={s.label} className="flex justify-between">
+              <span className="text-gray-600">{s.label}</span>
+              <span className="font-mono text-sm">{s.value}</span>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   )

@@ -10,11 +10,22 @@
 
 import type * as auditLogs from "../auditLogs.js";
 import type * as categories from "../categories.js";
+import type * as config from "../config.js";
+import type * as customers from "../customers.js";
+import type * as expenses from "../expenses.js";
+import type * as heldOrders from "../heldOrders.js";
 import type * as inventory from "../inventory.js";
+import type * as notifications from "../notifications.js";
+import type * as permissions from "../permissions.js";
+import type * as priceHistory from "../priceHistory.js";
 import type * as products from "../products.js";
+import type * as promoCodes from "../promoCodes.js";
+import type * as purchaseOrders from "../purchaseOrders.js";
 import type * as sales from "../sales.js";
+import type * as stockCounts from "../stockCounts.js";
 import type * as supplierProducts from "../supplierProducts.js";
 import type * as suppliers from "../suppliers.js";
+import type * as tables from "../tables.js";
 import type * as users from "../users.js";
 
 import type {
@@ -26,11 +37,22 @@ import type {
 declare const fullApi: ApiFromModules<{
   auditLogs: typeof auditLogs;
   categories: typeof categories;
+  config: typeof config;
+  customers: typeof customers;
+  expenses: typeof expenses;
+  heldOrders: typeof heldOrders;
   inventory: typeof inventory;
+  notifications: typeof notifications;
+  permissions: typeof permissions;
+  priceHistory: typeof priceHistory;
   products: typeof products;
+  promoCodes: typeof promoCodes;
+  purchaseOrders: typeof purchaseOrders;
   sales: typeof sales;
+  stockCounts: typeof stockCounts;
   supplierProducts: typeof supplierProducts;
   suppliers: typeof suppliers;
+  tables: typeof tables;
   users: typeof users;
 }>;
 

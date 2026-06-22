@@ -1,5 +1,6 @@
 const jwt = require('jsonwebtoken')
 const config = require('../config')
+const { client, ref } = require('../convex')
 
 function authenticate(req, res, next) {
   const header = req.headers.authorization
@@ -26,4 +27,31 @@ function authorize(...roles) {
   }
 }
 
-module.exports = { authenticate, authorize }
+const permCache = {}
+
+function checkPermission(page, action) {
+  return async (req, res, next) => {
+    if (req.user.role === 'superadmin') return next()
+    const key = `${req.user.role}-${page}`
+    if (!permCache[key]) {
+      try {
+        const perm = await client.query(ref('permissions:getByRoleAndPage'), { role: req.user.role, page })
+        permCache[key] = perm || { canRead: true, canWrite: true, canExecute: true }
+      } catch {
+        permCache[key] = { canRead: true, canWrite: true, canExecute: true }
+      }
+    }
+    const p = permCache[key]
+    const actionMap = { read: 'canRead', write: 'canWrite', execute: 'canExecute' }
+    if (!p[actionMap[action]]) {
+      return res.status(403).json({ message: 'Forbidden. Insufficient permissions.' })
+    }
+    next()
+  }
+}
+
+function clearPermCache() {
+  Object.keys(permCache).forEach((k) => delete permCache[k])
+}
+
+module.exports = { authenticate, authorize, checkPermission, clearPermCache }
