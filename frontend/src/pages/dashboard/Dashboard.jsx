@@ -46,6 +46,8 @@ function Dashboard() {
   const [bestSellers, setBestSellers] = useState([])
   const [activeUsers, setActiveUsers] = useState([])
   const [recentActivity, setRecentActivity] = useState([])
+  const [categorySales, setCategorySales] = useState([])
+  const [lowStockItems, setLowStockItems] = useState([])
   const initialLoad = useRef(true)
 
   const loadAll = () => {
@@ -66,9 +68,12 @@ function Dashboard() {
       reportsApi.bestSellers({ period: chartPeriod, limit: '5' }),
       reportsApi.activeUsers(),
       auditLogsApi.getAll({ limit: '10' }),
+      reportsApi.categorySales({ period: chartPeriod }),
+      reportsApi.inventory(),
     ]).then(([
       summaryData, dailyRes, salesData, prodData,
       profitsRes, prevProfitsRes, pmRes, hourlyRes, bestRes, activeRes, activityRes,
+      catRes, invRes,
     ]) => {
       setSummary(summaryData)
       setDailyData(dailyRes.dailySummaries || [])
@@ -83,6 +88,8 @@ function Dashboard() {
       setBestSellers(bestRes.bestSellers || [])
       setActiveUsers(activeRes.users || [])
       setRecentActivity((activityRes.data || []).slice(0, 10))
+      setCategorySales(catRes.categories || [])
+      setLowStockItems((invRes.lowStock || []).filter((p) => p.stock > 0 && p.stock <= 10))
     })
   }
 
@@ -123,9 +130,15 @@ function Dashboard() {
     : null
   const activeCount = activeUsers.length
 
+  const dodSales = summary?.yesterdaySales > 0 ? ((summary.todaySales - summary.yesterdaySales) / summary.yesterdaySales) * 100 : null
+  const dodRevenue = summary?.yesterdayRevenue > 0 ? ((summary.todayRevenue - summary.yesterdayRevenue) / summary.yesterdayRevenue) * 100 : null
+  const returnRate = summary?.totalSales > 0 ? ((summary.voidedCount || 0) / summary.totalSales) * 100 : 0
+  const invValue = summary?.inventoryValue || 0
+  const lowStockCount = summary?.lowStockCount || 0
+
   const mainCards = [
-    { key: 'todaySales', label: 'Today Sales', icon: 'todaySales', color: 'from-blue-500 to-blue-600' },
-    { key: 'todayRevenue', label: "Today's Revenue", prefix: '₱', icon: 'todayRevenue', color: 'from-emerald-500 to-emerald-600' },
+    { key: 'todaySales', label: 'Today Sales', icon: 'todaySales', color: 'from-blue-500 to-blue-600', dod: dodSales },
+    { key: 'todayRevenue', label: "Today's Revenue", prefix: '₱', icon: 'todayRevenue', color: 'from-emerald-500 to-emerald-600', dod: dodRevenue },
     { key: 'totalRevenue', label: 'Total Revenue', prefix: '₱', icon: 'totalRevenue', color: 'from-teal-500 to-teal-600' },
     { key: 'totalSales', label: 'Total Sales', icon: 'totalSales', color: 'from-indigo-500 to-indigo-600' },
   ]
@@ -133,8 +146,15 @@ function Dashboard() {
   const metricCards = [
     { label: 'Net Profit', value: netProfit, prefix: '₱', icon: 'netProfit', color: 'from-violet-500 to-violet-600' },
     { label: 'Avg Order Value', value: avgOrder, prefix: '₱', icon: 'avgOrder', color: 'from-cyan-500 to-cyan-600' },
-    { label: 'MoM Growth', value: momGrowth, suffix: '%', icon: 'momGrowth', color: momGrowth >= 0 ? 'from-green-500 to-green-600' : 'from-red-500 to-red-600' },
+    { label: 'Return Rate', value: returnRate, suffix: '%', icon: 'momGrowth', color: returnRate <= 5 ? 'from-green-500 to-green-600' : 'from-red-500 to-red-600' },
     { label: 'Active Users Today', value: activeCount, icon: 'activeUsers', color: 'from-amber-500 to-amber-600' },
+  ]
+
+  const bottomCards = [
+    { label: 'MoM Growth', value: momGrowth, suffix: '%', icon: 'momGrowth', color: momGrowth >= 0 ? 'from-green-500 to-green-600' : 'from-red-500 to-red-600' },
+    { label: 'Inventory Value', value: invValue, prefix: '₱', icon: 'totalProducts', color: 'from-indigo-500 to-indigo-600' },
+    { label: 'Low Stock Items', value: lowStockCount, icon: 'lowStockCount', color: lowStockCount > 0 ? 'from-orange-500 to-orange-600' : 'from-green-500 to-green-600' },
+    { label: 'Discount Impact Today', value: summary?.todayDiscAmount || 0, prefix: '₱', icon: 'avgOrder', color: 'from-rose-500 to-rose-600' },
   ]
 
   if (loading) {
@@ -168,7 +188,14 @@ function Dashboard() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={icons[card.icon]} />
                 </svg>
               </div>
-              <p className="text-2xl font-bold text-gray-800">{display}</p>
+              <div className="flex items-center gap-2">
+                <p className="text-2xl font-bold text-gray-800">{display}</p>
+                {card.dod !== undefined && card.dod !== null && (
+                  <span className={`text-xs font-medium ${card.dod >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    {card.dod >= 0 ? '+' : ''}{card.dod.toFixed(1)}%
+                  </span>
+                )}
+              </div>
               <p className="text-sm text-gray-400 mt-0.5">{card.label}</p>
             </div>
           )
@@ -187,6 +214,31 @@ function Dashboard() {
             display = Number(card.value || 0).toLocaleString()
           }
 
+          return (
+            <div key={card.label} className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 hover:shadow-md transition-shadow">
+              <div className={`w-11 h-11 rounded-xl bg-gradient-to-br ${card.color} flex items-center justify-center mb-3 shadow-sm`}>
+                <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={icons[card.icon]} />
+                </svg>
+              </div>
+              <p className={`text-2xl font-bold ${card.suffix === '%' && card.value < 0 ? 'text-red-600' : 'text-gray-800'}`}>{display}</p>
+              <p className="text-sm text-gray-400 mt-0.5">{card.label}</p>
+            </div>
+          )
+        })}
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {bottomCards.map((card) => {
+          let display
+          if (card.suffix === '%') {
+            const v = card.value
+            display = v !== null ? `${v >= 0 ? '+' : ''}${v.toFixed(1)}%` : 'N/A'
+          } else if (card.prefix) {
+            display = formatCurrency(card.value)
+          } else {
+            display = Number(card.value || 0).toLocaleString()
+          }
           return (
             <div key={card.label} className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 hover:shadow-md transition-shadow">
               <div className={`w-11 h-11 rounded-xl bg-gradient-to-br ${card.color} flex items-center justify-center mb-3 shadow-sm`}>
@@ -251,6 +303,30 @@ function Dashboard() {
                 <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 11 }} />
               </PieChart>
             </ResponsiveContainer>
+          )}
+        </div>
+
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+          <h2 className="text-lg font-semibold text-gray-800 mb-4">Top Categories</h2>
+          {categorySales.length === 0 ? (
+            <p className="text-sm text-gray-400 text-center py-12">No data.</p>
+          ) : (
+            <div className="space-y-3">
+              {categorySales.slice(0, 7).map((cat, i) => {
+                const maxRev = Math.max(...categorySales.map((c) => c.revenue), 1)
+                return (
+                  <div key={cat.category}>
+                    <div className="flex items-center justify-between text-sm mb-1">
+                      <span className="text-gray-700 truncate flex-1">{i + 1}. {cat.category}</span>
+                      <span className="text-gray-500 ml-2">{formatCurrency(cat.revenue)}</span>
+                    </div>
+                    <div className="w-full bg-gray-100 rounded-full h-2">
+                      <div className="bg-teal-500 h-2 rounded-full" style={{ width: `${(cat.revenue / maxRev) * 100}%` }} />
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
           )}
         </div>
       </div>
@@ -333,7 +409,7 @@ function Dashboard() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
           <h2 className="text-lg font-semibold text-gray-800 mb-4">Recent User Activity</h2>
           {recentActivity.length === 0 ? (
@@ -364,6 +440,22 @@ function Dashboard() {
                 <div key={p._id || p.id} className="flex items-center justify-between text-sm py-1.5 border-b border-gray-50 last:border-0">
                   <span className="text-gray-700 truncate flex-1">{p.name}</span>
                   <span className="ml-2 font-medium text-red-600">0</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+          <h2 className="text-lg font-semibold text-gray-800 mb-4">Low Stock Alerts</h2>
+          {lowStockItems.length === 0 ? (
+            <p className="text-sm text-gray-400 text-center py-6">No low-stock items.</p>
+          ) : (
+            <div className="space-y-2 max-h-64 overflow-auto">
+              {lowStockItems.map((p) => (
+                <div key={p._id || p.id} className="flex items-center justify-between text-sm py-1.5 border-b border-gray-50 last:border-0">
+                  <span className="text-gray-700 truncate flex-1">{p.name}</span>
+                  <span className="ml-2 font-medium text-orange-500">{p.stock}</span>
                 </div>
               ))}
             </div>
