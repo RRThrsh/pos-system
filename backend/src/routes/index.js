@@ -14,6 +14,8 @@ const permissionRoutes = require('./permissions')
 const purchaseOrderRoutes = require('./purchaseOrders')
 const expenseRoutes = require('./expenses')
 const promoCodeRoutes = require('./promoCodes')
+const tableRoutes = require('./tables')
+const notificationRoutes = require('./notifications')
 
 const router = Router()
 
@@ -31,5 +33,7 @@ router.use('/permissions', permissionRoutes)
 router.use('/purchase-orders', purchaseOrderRoutes)
 router.use('/expenses', expenseRoutes)
 router.use('/promo-codes', promoCodeRoutes)
+router.use('/tables', tableRoutes)
+router.use('/notifications', notificationRoutes)
 
 module.exports = router
