@@ -3,7 +3,7 @@ import { expensesApi } from '../../services/api.js'
 import Modal from '../../components/Modal.jsx'
 import Spinner from '../../components/Spinner.jsx'
 import Pagination, { PAGE_SIZE } from '../../components/Pagination.jsx'
-import { Button, InputField, Select } from '../../components/index.js'
+import { Button, InputField, Select, ConfirmDialog } from '../../components/index.js'
 import { useToast } from '../../context/ToastContext.jsx'
 import { usePermission } from '../../hooks/usePermission.js'
 
@@ -20,6 +20,8 @@ function Expenses() {
   const [modalOpen, setModalOpen] = useState(false)
   const [categoryFilter, setCategoryFilter] = useState('')
   const [form, setForm] = useState({ description: '', amount: '', category: expenseCategories[0], paymentMethod: paymentMethods[0], reference: '' })
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
+  const [deleteTarget, setDeleteTarget] = useState(null)
 
   const load = () => {
     setLoading(true)
@@ -43,7 +45,6 @@ function Expenses() {
   }
 
   const handleDelete = async (id) => {
-    if (!confirm('Delete this expense?')) return
     try { await expensesApi.remove(id); addToast('Expense deleted', 'success'); load() }
     catch (err) { addToast(err.message || 'Failed to delete', 'error') }
   }
@@ -75,7 +76,7 @@ function Expenses() {
                       <td className="px-4 py-3">{e.paymentMethod}</td>
                       <td className="px-4 py-3 text-gray-500">{e.reference || '-'}</td>
                       <td className="px-4 py-3 text-gray-500">{new Date(e.createdAt).toLocaleDateString()}</td>
-                      <td className="px-4 py-3">{canExecute && <Button variant="danger" size="sm" onClick={() => handleDelete(e._id)}>Delete</Button>}</td>
+                      <td className="px-4 py-3">{canExecute && <Button variant="danger" size="sm" onClick={() => { setDeleteTarget(e._id); setDeleteConfirmOpen(true) }}>Delete</Button>}</td>
                     </tr>
                   ))}
               </tbody>
@@ -102,6 +103,16 @@ function Expenses() {
             </div>
           </div>
         </Modal>
+
+      <ConfirmDialog
+        isOpen={deleteConfirmOpen}
+        onClose={() => { setDeleteConfirmOpen(false); setDeleteTarget(null) }}
+        onConfirm={() => { handleDelete(deleteTarget); setDeleteConfirmOpen(false); setDeleteTarget(null) }}
+        title="Delete Expense"
+        message="Are you sure you want to delete this expense? This action cannot be undone."
+        confirmText="Delete"
+        confirmVariant="danger"
+      />
     </div>
   )
 }

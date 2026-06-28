@@ -3,7 +3,7 @@ import { purchaseOrdersApi, suppliersApi, productsApi } from '../../services/api
 import Modal from '../../components/Modal.jsx'
 import Spinner from '../../components/Spinner.jsx'
 import Pagination, { PAGE_SIZE } from '../../components/Pagination.jsx'
-import { Button, InputField, Select, Textarea } from '../../components/index.js'
+import { Button, InputField, Select, Textarea, ConfirmDialog } from '../../components/index.js'
 import { useToast } from '../../context/ToastContext.jsx'
 import { usePermission } from '../../hooks/usePermission.js'
 
@@ -18,6 +18,8 @@ function PurchaseOrders() {
   const [statusFilter, setStatusFilter] = useState('')
   const [page, setPage] = useState(1)
   const [modalOpen, setModalOpen] = useState(false)
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
+  const [deleteTarget, setDeleteTarget] = useState(null)
   const [suppliers, setSuppliers] = useState([])
   const [products, setProducts] = useState([])
   const [selectedSupplier, setSelectedSupplier] = useState('')
@@ -102,7 +104,6 @@ function PurchaseOrders() {
   }
 
   const handleDelete = async (id) => {
-    if (!confirm('Delete this purchase order?')) return
     try { await purchaseOrdersApi.remove(id); addToast('Purchase order deleted', 'success'); load() }
     catch (err) { addToast(err.message || 'Failed to delete', 'error') }
   }
@@ -149,7 +150,7 @@ function PurchaseOrders() {
                         {(canExecute && (o.status === 'ordered' || o.status === 'partially-received')) && (
                           <Button variant="ghost" size="sm" onClick={() => openReceive(o)}>{o.status === 'partially-received' ? 'Receive More' : 'Receive'}</Button>
                         )}
-                        {canExecute && <Button variant="danger" size="sm" onClick={() => handleDelete(o._id)}>Delete</Button>}
+                        {canExecute && <Button variant="danger" size="sm" onClick={() => { setDeleteTarget(o._id); setDeleteConfirmOpen(true) }}>Delete</Button>}
                       </td>
                     </tr>
                   ))}
@@ -215,6 +216,16 @@ function PurchaseOrders() {
             </div>
           </div>
         </Modal>
+
+      <ConfirmDialog
+        isOpen={deleteConfirmOpen}
+        onClose={() => { setDeleteConfirmOpen(false); setDeleteTarget(null) }}
+        onConfirm={() => { handleDelete(deleteTarget); setDeleteConfirmOpen(false); setDeleteTarget(null) }}
+        title="Delete Purchase Order"
+        message="Are you sure you want to delete this purchase order? This action cannot be undone."
+        confirmText="Delete"
+        confirmVariant="danger"
+      />
     </div>
   )
 }

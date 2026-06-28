@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { tablesApi } from '../../services/api.js'
 import Modal from '../../components/Modal.jsx'
 import Spinner from '../../components/Spinner.jsx'
-import { Button, InputField, Select } from '../../components/index.js'
+import { Button, InputField, Select, ConfirmDialog } from '../../components/index.js'
 import { useToast } from '../../context/ToastContext.jsx'
 import { usePermission } from '../../hooks/usePermission.js'
 
@@ -22,6 +22,8 @@ function Tables() {
   const [editModalOpen, setEditModalOpen] = useState(false)
   const [selectedTable, setSelectedTable] = useState(null)
   const [form, setForm] = useState({ number: '', capacity: '', status: 'available' })
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
+  const [deleteTarget, setDeleteTarget] = useState(null)
 
   const load = () => {
     setLoading(true)
@@ -61,7 +63,6 @@ function Tables() {
     } catch (err) { addToast(err.message || 'Failed to update', 'error') }
   }
   const handleDelete = async (table) => {
-    if (!confirm(`Delete table ${table.number}?`)) return
     try {
       await tablesApi.remove(table._id || table.id)
       addToast('Table deleted', 'success')
@@ -87,12 +88,22 @@ function Tables() {
               <div className="text-xs mt-1 capitalize">{t.status}</div>
               <div className="text-xs mt-0.5 opacity-75">{t.capacity} seats</div>
               {canWrite && (
-                <button onClick={(e) => { e.stopPropagation(); handleDelete(t) }} className="absolute top-1 right-1 text-red-500 hover:text-red-700 text-lg leading-none">&times;</button>
+                <button onClick={(e) => { e.stopPropagation(); setDeleteTarget(t); setDeleteConfirmOpen(true) }} className="absolute top-1 right-1 text-red-500 hover:text-red-700 text-lg leading-none">&times;</button>
               )}
             </button>
           ))}
         </div>
       )}
+      <ConfirmDialog
+        isOpen={deleteConfirmOpen}
+        onClose={() => { setDeleteConfirmOpen(false); setDeleteTarget(null) }}
+        onConfirm={() => { handleDelete(deleteTarget); setDeleteConfirmOpen(false); setDeleteTarget(null) }}
+        title={`Delete Table ${deleteTarget?.number || ''}`}
+        message={`Are you sure you want to delete table ${deleteTarget?.number || ''}? This action cannot be undone.`}
+        confirmText="Delete"
+        confirmVariant="danger"
+      />
+
       <Modal isOpen={modalOpen} onClose={() => setModalOpen(false)} title="Add Table">
         <div className="space-y-4">
           <InputField name="number" placeholder="Table number (e.g. 1, A2, Patio-3)" value={form.number} onChange={(e) => setForm({ ...form, number: e.target.value })} />

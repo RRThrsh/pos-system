@@ -3,7 +3,7 @@ import { usersApi } from '../../services/api.js'
 import Modal from '../../components/Modal.jsx'
 import Spinner from '../../components/Spinner.jsx'
 import Pagination, { PAGE_SIZE } from '../../components/Pagination.jsx'
-import { Button, InputField, Select } from '../../components/index.js'
+import { Button, InputField, Select, ConfirmDialog } from '../../components/index.js'
 import { useToast } from '../../context/ToastContext.jsx'
 import { useAuth } from '../../context/AuthContext.jsx'
 
@@ -18,6 +18,8 @@ function Users() {
   const [editing, setEditing] = useState(null)
   const [form, setForm] = useState(emptyForm)
   const [page, setPage] = useState(1)
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
+  const [deleteTarget, setDeleteTarget] = useState(null)
 
   const load = () => {
     setLoading(true)
@@ -102,7 +104,6 @@ function Users() {
       addToast('Cannot delete the only superadmin.', 'error')
       return
     }
-    if (!confirm('Delete this user?')) return
     try {
       await usersApi.remove(id)
       addToast('User deleted', 'success')
@@ -158,7 +159,7 @@ function Users() {
                             <Button
                               variant="danger"
                               size="sm"
-                              onClick={() => !disabled && handleDelete(item._id || item.id, item)}
+                              onClick={() => { if (!disabled) { setDeleteTarget(item); setDeleteConfirmOpen(true) } }}
                               className={disabled ? 'opacity-50 cursor-not-allowed' : ''}
                               title={isSelf ? 'Cannot delete your own account' : isLastSuperadmin ? 'Cannot delete the only superadmin' : 'Delete user'}
                               disabled={disabled}
@@ -183,6 +184,16 @@ function Users() {
           <Pagination items={items} currentPage={page} onPageChange={setPage} />
         </div>
       )}
+
+      <ConfirmDialog
+        isOpen={deleteConfirmOpen}
+        onClose={() => { setDeleteConfirmOpen(false); setDeleteTarget(null) }}
+        onConfirm={() => { handleDelete(deleteTarget._id || deleteTarget.id, deleteTarget); setDeleteConfirmOpen(false); setDeleteTarget(null) }}
+        title="Delete User"
+        message="Are you sure you want to delete this user? This action cannot be undone."
+        confirmText="Delete"
+        confirmVariant="danger"
+      />
 
       <Modal isOpen={modalOpen} onClose={() => setModalOpen(false)} title={editing ? 'Edit User' : 'Add User'}>
         <form onSubmit={handleSave} className="space-y-3">

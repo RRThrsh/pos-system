@@ -47,13 +47,14 @@ function Login() {
     setLoading(true)
 
     try {
-      await login(trimmedUser, trimmedPass, remember)
+      const user = await login(trimmedUser, trimmedPass, remember)
       if (remember) {
         localStorage.setItem('remembered_username', trimmedUser)
       } else {
         localStorage.removeItem('remembered_username')
       }
-      const from = location.state?.from?.pathname || '/dashboard'
+      const fallback = user?.role === 'cashier' ? '/cashier' : '/dashboard'
+      const from = location.state?.from?.pathname || fallback
       navigate(from, { replace: true })
     } catch (err) {
       setError(err.response?.message || err.message || 'Invalid username or password.')

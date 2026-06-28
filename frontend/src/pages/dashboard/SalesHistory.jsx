@@ -16,6 +16,8 @@ function SalesHistory() {
   const [viewItem, setViewItem] = useState(null)
   const [page, setPage] = useState(1)
   const [csvConfirmOpen, setCsvConfirmOpen] = useState(false)
+  const [voidConfirmOpen, setVoidConfirmOpen] = useState(false)
+  const [voidTarget, setVoidTarget] = useState(null)
 
   const load = () => {
     setLoading(true)
@@ -37,7 +39,6 @@ function SalesHistory() {
   useEffect(() => { load() }, [])
 
   const handleVoid = async (id) => {
-    if (!confirm('Void this sale? This action cannot be undone.')) return
     try {
       await salesApi.voidSale(id)
       addToast('Sale voided', 'success')
@@ -104,7 +105,7 @@ function SalesHistory() {
                   <td className="px-4 py-3 text-center">
                     <Button variant="ghost" size="sm" onClick={() => setViewItem(sale)}>View</Button>
                     {sale.status !== 'voided' && canExecute && (
-                      <Button variant="danger" size="sm" onClick={() => handleVoid(sale._id || sale.id)}>Void</Button>
+                      <Button variant="danger" size="sm" onClick={() => { setVoidTarget(sale._id || sale.id); setVoidConfirmOpen(true) }}>Void</Button>
                     )}
                   </td>
                 </tr>
@@ -125,6 +126,16 @@ function SalesHistory() {
         title="Export Sales CSV"
         message="You are about to export all loaded sales records to a CSV file. This may contain a large amount of data."
         confirmText="Export"
+      />
+
+      <ConfirmDialog
+        isOpen={voidConfirmOpen}
+        onClose={() => { setVoidConfirmOpen(false); setVoidTarget(null) }}
+        onConfirm={() => { handleVoid(voidTarget); setVoidConfirmOpen(false); setVoidTarget(null) }}
+        title="Void Sale"
+        message="Are you sure you want to void this sale? This action cannot be undone."
+        confirmText="Void"
+        confirmVariant="danger"
       />
 
       <Modal isOpen={!!viewItem} onClose={() => setViewItem(null)} title="Sale Details">

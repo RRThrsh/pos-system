@@ -30,6 +30,8 @@ function Products() {
   const [printProduct, setPrintProduct] = useState(null)
   const [printQty, setPrintQty] = useState(1)
   const [csvConfirmOpen, setCsvConfirmOpen] = useState(false)
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
+  const [deleteTarget, setDeleteTarget] = useState(null)
 
   const openPrintBarcode = (product) => {
     setPrintProduct(product)
@@ -111,7 +113,6 @@ function Products() {
   }
 
   const handleDelete = async (id) => {
-    if (!confirm('Delete this product?')) return
     try { await productsApi.remove(id); addToast('Product deleted', 'success'); load() }
     catch (err) { addToast(err.message || 'Delete failed', 'error') }
   }
@@ -196,7 +197,7 @@ function Products() {
                     <td className="px-4 py-3 text-center">
                       <Button variant="ghost" size="sm" onClick={() => openPrintBarcode(item)} title="Print Barcode"><svg className="w-4 h-4 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6.72 14.84l-2.12 2.12a3 3 0 0 0 0 4.24 3 3 0 0 0 4.24 0l2.12-2.12m0-11.28l2.12-2.12a3 3 0 0 1 4.24 0 3 3 0 0 1 0 4.24l-2.12 2.12M14.84 6.72l-8.12 8.12" /></svg></Button>
                       {canWrite && <Button variant="ghost" size="sm" onClick={() => openEdit(item)}>Edit</Button>}
-                      {canExecute && <Button variant="danger" size="sm" onClick={() => handleDelete(item._id || item.id)}>Delete</Button>}
+                      {canExecute && <Button variant="danger" size="sm" onClick={() => { setDeleteTarget(item._id || item.id); setDeleteConfirmOpen(true) }}>Delete</Button>}
                     </td>
                   </tr>
                 )
@@ -271,6 +272,16 @@ function Products() {
         title="Export Products CSV"
         message="You are about to export all loaded products to a CSV file. This may contain a large amount of data."
         confirmText="Export"
+      />
+
+      <ConfirmDialog
+        isOpen={deleteConfirmOpen}
+        onClose={() => { setDeleteConfirmOpen(false); setDeleteTarget(null) }}
+        onConfirm={() => { handleDelete(deleteTarget); setDeleteConfirmOpen(false); setDeleteTarget(null) }}
+        title="Delete Product"
+        message="Are you sure you want to delete this product? This action cannot be undone."
+        confirmText="Delete"
+        confirmVariant="danger"
       />
 
       <Modal isOpen={printModalOpen} onClose={() => setPrintModalOpen(false)} title="Print Barcode Label">

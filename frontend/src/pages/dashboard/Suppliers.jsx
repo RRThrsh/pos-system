@@ -3,7 +3,7 @@ import { suppliersApi, productsApi } from '../../services/api.js'
 import Modal from '../../components/Modal.jsx'
 import Spinner from '../../components/Spinner.jsx'
 import Pagination, { PAGE_SIZE } from '../../components/Pagination.jsx'
-import { Button, InputField, Select, Textarea } from '../../components/index.js'
+import { Button, InputField, Select, Textarea, ConfirmDialog } from '../../components/index.js'
 import { useToast } from '../../context/ToastContext.jsx'
 import { usePermission } from '../../hooks/usePermission.js'
 
@@ -217,6 +217,8 @@ function Suppliers() {
   const [page, setPage] = useState(1)
   const [productModal, setProductModal] = useState(false)
   const [compareModal, setCompareModal] = useState(false)
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
+  const [deleteTarget, setDeleteTarget] = useState(null)
   const [selectedSupplier, setSelectedSupplier] = useState(null)
 
   const load = () => {
@@ -259,7 +261,6 @@ function Suppliers() {
   }
 
   const handleDelete = async (id) => {
-    if (!confirm('Delete this supplier?')) return
     try {
       await suppliersApi.remove(id)
       addToast('Supplier deleted', 'success')
@@ -306,7 +307,7 @@ function Suppliers() {
                     <div className="flex items-center justify-center gap-2">
                       {canWrite && <Button variant="ghost" size="sm" onClick={() => openEdit(item)}>Edit</Button>}
                       <Button variant="ghost" size="sm" onClick={() => openProducts(item)}>Products</Button>
-                      {canExecute && <Button variant="danger" size="sm" onClick={() => handleDelete(item._id || item.id)}>Delete</Button>}
+                      {canExecute && <Button variant="danger" size="sm" onClick={() => { setDeleteTarget(item._id || item.id); setDeleteConfirmOpen(true) }}>Delete</Button>}
                     </div>
                   </td>
                 </tr>
@@ -338,6 +339,16 @@ function Suppliers() {
 
       <SupplierProductsModal isOpen={productModal} onClose={() => { setProductModal(false); setSelectedSupplier(null) }} supplier={selectedSupplier} />
       <CompareModal isOpen={compareModal} onClose={() => setCompareModal(false)} />
+
+      <ConfirmDialog
+        isOpen={deleteConfirmOpen}
+        onClose={() => { setDeleteConfirmOpen(false); setDeleteTarget(null) }}
+        onConfirm={() => { handleDelete(deleteTarget); setDeleteConfirmOpen(false); setDeleteTarget(null) }}
+        title="Delete Supplier"
+        message="Are you sure you want to delete this supplier? This action cannot be undone."
+        confirmText="Delete"
+        confirmVariant="danger"
+      />
     </div>
   )
 }

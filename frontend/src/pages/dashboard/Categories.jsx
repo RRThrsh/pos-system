@@ -3,7 +3,7 @@ import { categoriesApi } from '../../services/api.js'
 import Modal from '../../components/Modal.jsx'
 import Spinner from '../../components/Spinner.jsx'
 import Pagination, { PAGE_SIZE } from '../../components/Pagination.jsx'
-import { Button, InputField } from '../../components/index.js'
+import { Button, InputField, ConfirmDialog } from '../../components/index.js'
 import { useToast } from '../../context/ToastContext.jsx'
 import { usePermission } from '../../hooks/usePermission.js'
 
@@ -16,6 +16,8 @@ function Categories() {
   const [editing, setEditing] = useState(null)
   const [name, setName] = useState('')
   const [page, setPage] = useState(1)
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
+  const [deleteTarget, setDeleteTarget] = useState(null)
 
   const load = () => {
     setLoading(true)
@@ -49,7 +51,6 @@ function Categories() {
   }
 
   const handleDelete = async (id) => {
-    if (!confirm('Delete this category?')) return
     try {
       await categoriesApi.remove(id)
       addToast('Category deleted', 'success')
@@ -80,7 +81,7 @@ function Categories() {
                   <td className="px-4 py-3 font-medium text-gray-900">{item.name}</td>
                   <td className="px-4 py-3 text-center">
                     {canWrite && <Button variant="ghost" size="sm" onClick={() => openEdit(item)}>Edit</Button>}
-                    {canExecute && <Button variant="danger" size="sm" onClick={() => handleDelete(item._id || item.id)}>Delete</Button>}
+                    {canExecute && <Button variant="danger" size="sm" onClick={() => { setDeleteTarget(item._id || item.id); setDeleteConfirmOpen(true) }}>Delete</Button>}
                   </td>
                 </tr>
               ))}
@@ -102,8 +103,17 @@ function Categories() {
           </div>
         </form>
       </Modal>
+
+      <ConfirmDialog
+        isOpen={deleteConfirmOpen}
+        onClose={() => { setDeleteConfirmOpen(false); setDeleteTarget(null) }}
+        onConfirm={() => { handleDelete(deleteTarget); setDeleteConfirmOpen(false); setDeleteTarget(null) }}
+        title="Delete Category"
+        message="Are you sure you want to delete this category? This action cannot be undone."
+        confirmText="Delete"
+        confirmVariant="danger"
+      />
     </div>
   )
 }
-
 export default Categories

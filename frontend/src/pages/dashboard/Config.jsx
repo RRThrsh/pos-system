@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import Spinner from '../../components/Spinner.jsx'
-import { Button, InputField } from '../../components/index.js'
+import { Button, InputField, ConfirmDialog } from '../../components/index.js'
 import { useToast } from '../../context/ToastContext.jsx'
 import { configApi } from '../../services/api.js'
 import { SHORTCUT_ACTIONS, getDefaultShortcuts } from '../../constants/shortcuts.js'
@@ -17,6 +17,7 @@ function Config() {
   const [shortcutSaving, setShortcutSaving] = useState(false)
   const [resetLoading, setResetLoading] = useState(false)
   const [cacheCleared, setCacheCleared] = useState(false)
+  const [resetConfirmOpen, setResetConfirmOpen] = useState(false)
 
   useEffect(() => {
     Promise.all([
@@ -60,7 +61,6 @@ function Config() {
   }
 
   const handleResetAuditLogs = async () => {
-    if (!window.confirm('Are you sure you want to delete ALL audit logs? This cannot be undone.')) return
     setResetLoading(true)
     try {
       await configApi.resetAuditLogs()
@@ -161,7 +161,7 @@ function Config() {
             </svg>
           </div>
           <p className="text-sm text-gray-500 mb-4">Permanently delete all audit log entries. This action cannot be undone.</p>
-          <Button onClick={handleResetAuditLogs} disabled={resetLoading} variant="danger">
+          <Button onClick={() => setResetConfirmOpen(true)} disabled={resetLoading} variant="danger">
             {resetLoading ? 'Clearing...' : 'Reset Audit Logs'}
           </Button>
         </div>
@@ -258,6 +258,16 @@ function Config() {
           )}
         </div>
       </div>
+
+      <ConfirmDialog
+        isOpen={resetConfirmOpen}
+        onClose={() => setResetConfirmOpen(false)}
+        onConfirm={() => { handleResetAuditLogs(); setResetConfirmOpen(false) }}
+        title="Reset Audit Logs"
+        message="Are you sure you want to delete ALL audit logs? This cannot be undone."
+        confirmText="Reset"
+        confirmVariant="danger"
+      />
     </div>
   )
 }

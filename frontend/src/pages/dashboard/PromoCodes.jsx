@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { promoCodesApi } from '../../services/api.js'
 import Modal from '../../components/Modal.jsx'
 import Spinner from '../../components/Spinner.jsx'
-import { Button, InputField, Select } from '../../components/index.js'
+import { Button, InputField, Select, ConfirmDialog } from '../../components/index.js'
 import { useToast } from '../../context/ToastContext.jsx'
 import { usePermission } from '../../hooks/usePermission.js'
 
@@ -13,6 +13,8 @@ function PromoCodes() {
   const [loading, setLoading] = useState(true)
   const [modalOpen, setModalOpen] = useState(false)
   const [form, setForm] = useState({ code: '', discountType: 'percentage', discountValue: '', minPurchase: '', maxUses: '', expiresAt: '' })
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
+  const [deleteTarget, setDeleteTarget] = useState(null)
 
   const load = () => {
     setLoading(true)
@@ -48,7 +50,6 @@ function PromoCodes() {
   }
 
   const handleDelete = async (id) => {
-    if (!confirm('Delete this promo code?')) return
     try { await promoCodesApi.remove(id); addToast('Promo code deleted', 'success'); load() }
     catch (err) { addToast(err.message || 'Failed to delete', 'error') }
   }
@@ -93,7 +94,7 @@ function PromoCodes() {
                           {c.isActive ? 'Deactivate' : 'Activate'}
                         </Button>
                       )}
-                      {canExecute && <Button variant="danger" size="sm" onClick={() => handleDelete(c._id)}>Delete</Button>}
+                      {canExecute && <Button variant="danger" size="sm" onClick={() => { setDeleteTarget(c._id); setDeleteConfirmOpen(true) }}>Delete</Button>}
                     </td>
                   </tr>
                 ))}
@@ -122,6 +123,16 @@ function PromoCodes() {
             </div>
           </div>
         </Modal>
+
+      <ConfirmDialog
+        isOpen={deleteConfirmOpen}
+        onClose={() => { setDeleteConfirmOpen(false); setDeleteTarget(null) }}
+        onConfirm={() => { handleDelete(deleteTarget); setDeleteConfirmOpen(false); setDeleteTarget(null) }}
+        title="Delete Promo Code"
+        message="Are you sure you want to delete this promo code? This action cannot be undone."
+        confirmText="Delete"
+        confirmVariant="danger"
+      />
     </div>
   )
 }

@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { customersApi } from '../../services/api.js'
 import Spinner from '../../components/Spinner.jsx'
-import { Button, InputField, Textarea } from '../../components/index.js'
+import { Button, InputField, Textarea, ConfirmDialog } from '../../components/index.js'
 import { useToast } from '../../context/ToastContext.jsx'
 
 function Customers() {
@@ -10,6 +10,8 @@ function Customers() {
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
+  const [deleteTarget, setDeleteTarget] = useState(null)
   const [editing, setEditing] = useState(null)
   const [form, setForm] = useState({ name: '', phone: '', email: '', address: '' })
 
@@ -52,7 +54,6 @@ function Customers() {
   }
 
   const handleDelete = async (id) => {
-    if (!confirm('Delete this customer?')) return
     try {
       await customersApi.remove(id)
       setCustomers(customers.filter(c => c._id !== id))
@@ -90,7 +91,7 @@ function Customers() {
                     <td className="px-4 py-3 text-center">
                       <div className="flex justify-center gap-2">
                         <Button variant="ghost" size="sm" onClick={() => handleEdit(c)}>Edit</Button>
-                        <Button variant="danger" size="sm" onClick={() => handleDelete(c._id)}>Delete</Button>
+                        <Button variant="danger" size="sm" onClick={() => { setDeleteTarget(c._id); setDeleteConfirmOpen(true) }}>Delete</Button>
                       </div>
                     </td>
                   </tr>
@@ -117,6 +118,16 @@ function Customers() {
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        isOpen={deleteConfirmOpen}
+        onClose={() => { setDeleteConfirmOpen(false); setDeleteTarget(null) }}
+        onConfirm={() => { handleDelete(deleteTarget); setDeleteConfirmOpen(false); setDeleteTarget(null) }}
+        title="Delete Customer"
+        message="Are you sure you want to delete this customer? This action cannot be undone."
+        confirmText="Delete"
+        confirmVariant="danger"
+      />
     </div>
   )
 }
