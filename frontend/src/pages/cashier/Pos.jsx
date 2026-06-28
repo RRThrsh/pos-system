@@ -1,11 +1,13 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { productsApi, salesApi, promoCodesApi, configApi, customersApi, heldOrdersApi } from '../../services/api.js'
+import { productsApi, salesApi, promoCodesApi, configApi, heldOrdersApi, categoriesApi } from '../../services/api.js'
 import { useToast } from '../../context/ToastContext.jsx'
 import { getDefaultShortcuts } from '../../constants/shortcuts.js'
 
 function Pos() {
   const { addToast } = useToast()
   const barcodeRef = useRef(null)
+  const handleCheckoutRef = useRef()
+  const handleBarcodeRef = useRef()
   const [products, setProducts] = useState([])
   const [search, setSearch] = useState('')
   const [barcode, setBarcode] = useState('')
@@ -25,12 +27,10 @@ function Pos() {
   const [taxRate, setTaxRate] = useState(0)
   const taxRateLoaded = useRef(false)
 
-  const [customerSearch, setCustomerSearch] = useState('')
-  const [customerResults, setCustomerResults] = useState([])
-  const [selectedCustomer, setSelectedCustomer] = useState(null)
-  const [showCustomerDropdown, setShowCustomerDropdown] = useState(false)
-  const [buyerTin, setBuyerTin] = useState('')
   const [orderNotes, setOrderNotes] = useState('')
+  const [currentTid, setCurrentTid] = useState('')
+
+  const generateTid = () => `#${Math.random().toString(36).slice(2, 12).toUpperCase()}`
 
   const [showQuickKeys, setShowQuickKeys] = useState(false)
   const [quickKeys, setQuickKeys] = useState([])
@@ -38,6 +38,8 @@ function Pos() {
   const [heldOrders, setHeldOrders] = useState([])
   const [showHeldOrders, setShowHeldOrders] = useState(false)
 
+  const [categories, setCategories] = useState([])
+  const [selectedCategory, setSelectedCategory] = useState('')
   const [storeInfo, setStoreInfo] = useState({ storeName: 'POS System', storeAddress: '', tin: '', ptuNumber: '' })
   const [shortcuts, setShortcuts] = useState(getDefaultShortcuts)
 
@@ -67,18 +69,22 @@ function Pos() {
         ptuNumber: ptu?.value || '',
       })
     }).catch(() => {})
-    configApi.get('shortcuts').then((res) => {
+      configApi.get('shortcuts').then((res) => {
       if (res && res.value) {
         try { const parsed = JSON.parse(res.value); setShortcuts(parsed) } catch {}
       }
     }).catch(() => {})
+    categoriesApi.getAll().then((res) => setCategories(Array.isArray(res) ? res : [])).catch(() => {})
   }, [])
 
   useEffect(() => {
     if (!search.trim()) { setResults([]); return }
     const q = search.toLowerCase()
-    setResults(products.filter((p) => p.name.toLowerCase().includes(q) || p.sku?.toLowerCase().includes(q) || p.barcode?.toLowerCase().includes(q)))
-  }, [search, products])
+    setResults(products.filter((p) =>
+      (p.name.toLowerCase().includes(q) || p.sku?.toLowerCase().includes(q) || p.barcode?.toLowerCase().includes(q)) &&
+      (!selectedCategory || p.category === selectedCategory || p.categoryId === selectedCategory)
+    ))
+  }, [search, products, selectedCategory])
 
   const handleBarcode = useCallback(() => {
     if (!barcode.trim()) return
@@ -86,10 +92,12 @@ function Pos() {
     if (product) { addToCart(product); setBarcode(''); barcodeRef.current?.focus() }
     else { addToast('Product not found for barcode: ' + barcode, 'error'); setBarcode('') }
   }, [barcode, products])
+  handleBarcodeRef.current = handleBarcode
 
-  useEffect(() => { if (barcode.length >= 4) handleBarcode() }, [barcode])
+  useEffect(() => { if (barcode.length >= 4) handleBarcodeRef.current() }, [barcode])
 
   const addToCart = (product) => {
+    if (!cart.length && !currentTid) setCurrentTid(generateTid())
     setCart((prev) => {
       const existing = prev.find((c) => (c._id || c.id) === (product._id || product.id))
       if (existing) return prev.map((c) => (c._id || c.id) === (product._id || product.id) ? { ...c, quantity: Math.min(c.quantity + 1, product.stock || 99) } : c)
@@ -108,6 +116,12 @@ function Pos() {
   }
 
   const removeFromCart = (id) => setCart((prev) => prev.filter((c) => (c._id || c.id) !== id))
+
+  const clearCart = () => {
+    if (!cart.length) return
+    setCart([])
+    addToast('Cart cleared', 'info')
+  }
 
   const updateCartItemNote = (id, notes) => setCart((prev) => prev.map((c) => (c._id || c.id) === id ? { ...c, notes } : c))
 
@@ -135,22 +149,12 @@ function Pos() {
     finally { setPromoLoading(false) }
   }
 
-  useEffect(() => {
-    if (!customerSearch.trim()) { setCustomerResults([]); setShowCustomerDropdown(false); return }
-    const timer = setTimeout(() => {
-      customersApi.search(customerSearch).then((res) => { setCustomerResults(Array.isArray(res) ? res : []); setShowCustomerDropdown(true) }).catch(() => {})
-    }, 300)
-    return () => clearTimeout(timer)
-  }, [customerSearch])
-
-  const selectCustomer = (c) => { setSelectedCustomer(c); setCustomerSearch(c.name); setShowCustomerDropdown(false) }
-
   const handleHoldOrder = async () => {
     if (!cart.length) return
     try {
       await heldOrdersApi.create({ items: cart, subtotal })
       addToast('Order held', 'success')
-      setCart([]); setSelectedCustomer(null); setCustomerSearch('')
+      setCart([])
       heldOrdersApi.getAll().then((res) => setHeldOrders(Array.isArray(res) ? res : [])).catch(() => {})
     } catch (err) { addToast(err.message || 'Failed to hold order', 'error') }
   }
@@ -160,7 +164,6 @@ function Pos() {
       const res = await heldOrdersApi.getById(order._id || order.id)
       if (res && res.items) {
         setCart(res.items.map((i) => ({ _id: i.productId, id: i.productId, productId: i.productId, name: i.productName, price: i.price, quantity: i.qty || i.quantity, notes: i.notes || '' })))
-        if (res.customerName) { setSelectedCustomer({ name: res.customerName, phone: res.customerPhone }); setCustomerSearch(res.customerName) }
       }
       await heldOrdersApi.remove(order._id || order.id)
       setHeldOrders((prev) => prev.filter((o) => (o._id || o.id) !== (order._id || order.id)))
@@ -172,31 +175,36 @@ function Pos() {
     if (!cart.length) return
     setSubmitting(true)
     try {
+      const tid = currentTid || generateTid()
       const sale = await salesApi.create({
         items: cart.map((c) => ({ productId: c._id || c.id, qty: c.quantity, notes: c.notes })),
-        transactionId: `TXN-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`,
+        transactionId: tid,
         paymentMethod, amountPaid: parseFloat(amountPaid) || total,
         discount: discValue, discountType, orderType: 'walk-in',
         promoCode: promoCode || undefined, tax: taxAmount || undefined, taxRate: taxRate || undefined,
-        customerId: selectedCustomer?._id || selectedCustomer?.id,
-        customerName: selectedCustomer?.name, customerPhone: selectedCustomer?.phone, buyerTin: buyerTin || undefined,
         notes: orderNotes || undefined,
       })
-      if (selectedCustomer && (selectedCustomer._id || selectedCustomer.id)) {
-        customersApi.addLoyaltyPoints(selectedCustomer._id || selectedCustomer.id, Math.floor(total)).catch(() => {})
-      }
       addToast('Sale completed!', 'success')
       setLastSale({
         ...sale, items: cart, subtotal, discount: discAmount + promoDiscount, tax: taxAmount, taxRate, total,
         paymentMethod, amountPaid: parseFloat(amountPaid) || total, change: change > 0 ? change : 0,
-        orderType: 'walk-in', customerName: selectedCustomer?.name, customerPhone: selectedCustomer?.phone,
-        buyerTin, promoCode: promoCode || undefined, notes: orderNotes, receiptNumber: sale.receiptNumber,
+        orderType: 'walk-in', transactionId: tid,
+        promoCode: promoCode || undefined, notes: orderNotes, receiptNumber: sale.receiptNumber,
       })
-      setCart([]); setAmountPaid(''); setDiscount(''); setPromoCode(''); setPromoDiscount(0)
-      setSelectedCustomer(null); setCustomerSearch(''); setBuyerTin(''); setOrderNotes('')
+      setCart([]); setCurrentTid(''); setAmountPaid(''); setDiscount(''); setPromoCode(''); setPromoDiscount(0)
+      setOrderNotes('')
       setShowReceipt(true)
     } catch (err) { addToast(err.message || 'Checkout failed', 'error') }
     finally { setSubmitting(false) }
+  }
+  handleCheckoutRef.current = handleCheckout
+
+  const toggleFullscreen = () => {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen()
+    } else {
+      document.exitFullscreen()
+    }
   }
 
   const handlePrint = () => {
@@ -227,8 +235,7 @@ function Pos() {
         ${storeInfo.ptuNumber ? `<p class="sub">PTU: ${storeInfo.ptuNumber}</p>` : ''}
         <p class="sub">${new Date().toLocaleString('en-PH')}</p>
         ${s.receiptNumber ? `<p class="sub">OR #: ${s.receiptNumber}</p>` : ''}
-        ${s.customerName ? `<p class="sub">Customer: ${s.customerName}</p>` : ''}
-        ${s.buyerTin ? `<p class="sub">TIN: ${s.buyerTin}</p>` : ''}
+        ${s.transactionId ? `<p class="sub">Txn: ${s.transactionId}</p>` : ''}
         <div class="line"></div>
         <table>${itemsHtml}</table>
         ${s.notes ? `<p class="small">${s.notes}</p>` : ''}
@@ -271,15 +278,17 @@ function Pos() {
 
   useEffect(() => {
     const handleKeyDown = (e) => {
+      if (e.repeat) return
       const s = shortcuts
-      if (e.key === s.charge?.key && cart.length) { e.preventDefault(); handleCheckout() }
+      if (e.key === s.charge?.key && cart.length) { e.preventDefault(); handleCheckoutRef.current() }
       if (e.key === s.scan?.key) { e.preventDefault(); barcodeRef.current?.focus() }
-      if (e.key === s.quickKeys?.key) { e.preventDefault(); setShowQuickKeys(!showQuickKeys) }
-      if (e.key === s.close?.key) { setShowReceipt(false); setShowHeldOrders(false) }
+      if (e.key === s.quickKeys?.key) { e.preventDefault(); setShowQuickKeys(prev => !prev) }
+      if (e.key === s.close?.key) { e.preventDefault(); setShowReceipt(false); setShowHeldOrders(false) }
+      if (e.key === s.fullscreen?.key) { e.preventDefault(); toggleFullscreen() }
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [cart, showQuickKeys, shortcuts])
+  }, [cart.length, shortcuts])
 
   return (
     <div className="flex gap-6 h-[calc(100vh-8rem)]">
@@ -296,7 +305,10 @@ function Pos() {
           </div>
           <div className="flex items-center gap-2">
             {cart.length > 0 && (
-              <button onClick={handleHoldOrder} className="px-3 py-2 text-sm bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors">Hold Order</button>
+              <>
+                <button onClick={clearCart} className="px-3 py-2 text-sm bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors">Clear</button>
+                <button onClick={handleHoldOrder} className="px-3 py-2 text-sm bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors">Hold Order</button>
+              </>
             )}
             <div className="relative">
               <button onClick={() => setShowHeldOrders(!showHeldOrders)} className="px-3 py-2 text-sm bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors">Held ({heldOrders.length})</button>
@@ -320,16 +332,30 @@ function Pos() {
         {showQuickKeys && (
           <div className="mb-4">
             <div className="grid grid-cols-6 sm:grid-cols-8 md:grid-cols-10 lg:grid-cols-12 gap-2">
-              {quickKeys.map((p) => (
-                <button key={p._id || p.id} onClick={() => addToCart(p)} className="bg-white border border-gray-200 rounded-lg p-2 text-center hover:border-indigo-400 hover:shadow-sm transition-all">
+              {quickKeys.map((p) => {
+                const lowStock = p.stock <= 5
+                return (
+                <button key={p._id || p.id} onClick={() => addToCart(p)} className={`bg-white border rounded-lg p-2 text-center hover:shadow-sm transition-all ${lowStock ? 'border-red-200 hover:border-red-400' : 'border-gray-200 hover:border-indigo-400'}`}>
                   <div className="text-xs font-medium text-gray-800 truncate">{p.name}</div>
                   <div className="text-xs text-indigo-600 font-semibold">&#8369;{Number(p.price).toLocaleString()}</div>
+                  {lowStock && <div className="text-[10px] text-red-500 font-medium mt-0.5">{p.stock} left</div>}
                 </button>
-              ))}
+                )
+              })}
             </div>
           </div>
         )}
 
+        {categories.length > 0 && (
+          <div className="flex items-center gap-1.5 mb-3 overflow-x-auto pb-1">
+            <button onClick={() => setSelectedCategory('')}
+              className={`shrink-0 px-3 py-1.5 text-xs font-medium rounded-full transition-colors ${!selectedCategory ? 'bg-indigo-600 text-white' : 'bg-gray-200 text-gray-600 hover:bg-gray-300'}`}>All</button>
+            {categories.map((c) => (
+              <button key={c._id || c.id || c.name} onClick={() => setSelectedCategory(c.name || c._id || c.id)}
+                className={`shrink-0 px-3 py-1.5 text-xs font-medium rounded-full transition-colors ${selectedCategory === (c.name || c._id || c.id) ? 'bg-indigo-600 text-white' : 'bg-gray-200 text-gray-600 hover:bg-gray-300'}`}>{c.name}</button>
+            ))}
+          </div>
+        )}
         <div className="relative mb-4">
           <input type="text" placeholder="Search products by name, SKU, or barcode..." value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -338,12 +364,20 @@ function Pos() {
           <svg className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" /></svg>
           {results.length > 0 && (
             <div className="absolute z-10 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-auto">
-              {results.map((p) => (
+              {results.map((p) => {
+                const lowStock = p.stock <= 5
+                return (
                 <button key={p._id || p.id} type="button" onClick={() => addToCart(p)} className="w-full flex items-center justify-between px-4 py-2.5 text-sm hover:bg-indigo-50 text-left transition-colors">
-                  <div><span className="font-medium text-gray-900">{p.name}</span>{p.unitValue && p.unit && <span className="text-gray-400 ml-1">{p.unitValue}{p.unit}</span>}<span className="text-gray-400 ml-2">{p.sku}</span></div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium text-gray-900">{p.name}</span>
+                    {lowStock && <span className="text-xs bg-red-100 text-red-600 px-1.5 py-0.5 rounded font-medium">{p.stock} left</span>}
+                    {p.unitValue && p.unit && <span className="text-gray-400">{p.unitValue}{p.unit}</span>}
+                    <span className="text-gray-400">{p.sku}</span>
+                  </div>
                   <span className="text-indigo-600 font-semibold">&#8369;{Number(p.price).toLocaleString()}</span>
                 </button>
-              ))}
+                )
+              })}
             </div>
           )}
         </div>
@@ -373,7 +407,16 @@ function Pos() {
                     <td className="px-4 py-3 text-center">
                       <div className="flex items-center justify-center gap-2">
                         <button onClick={() => updateQty(c._id || c.id, -1)} className="w-7 h-7 rounded-full border border-gray-300 text-gray-500 hover:bg-gray-100 transition-colors">-</button>
-                        <span className="w-6 text-center font-medium">{c.quantity}</span>
+                        <input type="number" min="1" value={c.quantity}
+                          onChange={(e) => {
+                            const v = parseInt(e.target.value, 10)
+                            if (!isNaN(v) && v > 0) {
+                              const product = products.find((p) => (p._id || p.id) === (c._id || c.id))
+                              const max = product?.stock || 99
+                              setCart((prev) => prev.map((ci) => (ci._id || ci.id) === (c._id || c.id) ? { ...ci, quantity: Math.min(v, max) } : ci))
+                            }
+                          }}
+                          className="w-12 text-center border border-gray-200 rounded px-1 py-1 text-sm" />
                         <button onClick={() => updateQty(c._id || c.id, 1)} className="w-7 h-7 rounded-full border border-gray-300 text-gray-500 hover:bg-gray-100 transition-colors">+</button>
                       </div>
                     </td>
@@ -396,24 +439,10 @@ function Pos() {
         <div className="bg-white rounded-lg shadow p-5 flex flex-col h-full">
           <h2 className="text-lg font-semibold text-gray-800 mb-4">Order Summary</h2>
 
-          <div className="relative mb-3">
-            <label className="block text-sm font-medium text-gray-700 mb-1">Customer</label>
-            <input value={customerSearch} onChange={(e) => { setCustomerSearch(e.target.value); if (!e.target.value) setSelectedCustomer(null) }}
-              placeholder="Search customer..." className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none" />
-            {showCustomerDropdown && customerResults.length > 0 && (
-              <div className="absolute z-10 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-40 overflow-auto">
-                {customerResults.map((c) => (
-                  <button key={c._id || c.id} type="button" onClick={() => selectCustomer(c)} className="w-full text-left px-3 py-2 text-sm hover:bg-indigo-50">{c.name} {c.phone ? `(${c.phone})` : ''}</button>
-                ))}
-              </div>
-            )}
-            {selectedCustomer && <div className="flex items-center gap-1 mt-1 text-xs text-green-600 font-medium"><span>&#10003; {selectedCustomer.name}</span></div>}
-          </div>
-
-          {selectedCustomer && (
-            <div className="mb-3">
-              <label className="block text-sm font-medium text-gray-700 mb-1">Buyer TIN (for BIR)</label>
-              <input value={buyerTin} onChange={(e) => setBuyerTin(e.target.value)} placeholder="Optional" className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none" />
+          {currentTid && (
+            <div className="mb-3 px-3 py-2 bg-gray-50 rounded-lg text-center">
+              <span className="text-xs text-gray-500">Txn:</span>
+              <span className="text-sm font-mono font-semibold text-gray-800 ml-1">{currentTid}</span>
             </div>
           )}
 
@@ -502,7 +531,7 @@ function Pos() {
 
             <div className="bg-gray-50 rounded-lg p-4 text-sm space-y-2 font-mono">
               <p className="text-center text-gray-500">{new Date().toLocaleString('en-PH')}</p>
-              {lastSale.customerName && <p className="text-center text-gray-600">{lastSale.customerName}</p>}
+              {lastSale.transactionId && <p className="text-center text-gray-600 text-xs">Txn: {lastSale.transactionId}</p>}
               <div className="border-t border-dashed border-gray-300 my-2" />
               {lastSale.items.map((item, i) => (
                 <div key={i} className="flex justify-between">
