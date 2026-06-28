@@ -3,6 +3,7 @@ import { salesApi, auditLogsApi } from '../../services/api.js'
 import Modal from '../../components/Modal.jsx'
 import Spinner from '../../components/Spinner.jsx'
 import Pagination, { PAGE_SIZE } from '../../components/Pagination.jsx'
+import { Button, Select } from '../../components/index.js'
 import { useToast } from '../../context/ToastContext.jsx'
 import { usePermission } from '../../hooks/usePermission.js'
 
@@ -104,7 +105,7 @@ function Returns() {
                   <td className="px-4 py-3 text-right font-medium">&#8369;{Number(sale.total || 0).toLocaleString()}</td>
                   <td className="px-4 py-3 capitalize text-gray-600">{sale.paymentMethod || sale.payment}</td>
                   <td className="px-4 py-3 text-center">
-                    {canExecute && <button onClick={() => openReturn(sale)} className="text-orange-600 hover:text-orange-800 font-medium">Return</button>}
+                    {canExecute && <Button variant="ghost" size="sm" onClick={() => openReturn(sale)}>Return</Button>}
                   </td>
                 </tr>
               ))}
@@ -141,15 +142,13 @@ function Returns() {
                     </div>
                     {item.returnQty > 0 && (
                       <div className="flex items-center gap-1">
-                        <button
+                        <Button variant="secondary" size="sm"
                           onClick={() => setQty(i, Math.max(0, item.returnQty - 1))}
-                          className="w-6 h-6 rounded border border-gray-300 text-gray-500 hover:bg-gray-100"
-                        >-</button>
+                          className="w-6 h-6 !p-0">-</Button>
                         <span className="w-6 text-center font-medium">{item.returnQty}</span>
-                        <button
+                        <Button variant="secondary" size="sm"
                           onClick={() => setQty(i, item.returnQty + 1)}
-                          className="w-6 h-6 rounded border border-gray-300 text-gray-500 hover:bg-gray-100"
-                        >+</button>
+                          className="w-6 h-6 !p-0">+</Button>
                       </div>
                     )}
                   </div>
@@ -162,25 +161,25 @@ function Returns() {
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-500 mb-1">Return Reason</label>
-              <select value={returnReason} onChange={(e) => setReturnReason(e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm">
+              <Select name="returnReason" value={returnReason} onChange={(e) => setReturnReason(e.target.value)}>
                 <option value="">Select reason...</option>
                 <option value="defective">Defective / Damaged</option>
                 <option value="wrong_item">Wrong Item</option>
                 <option value="customer_request">Customer Request</option>
                 <option value="exchange">Exchange</option>
                 <option value="other">Other</option>
-              </select>
+              </Select>
             </div>
             <p className="text-xs text-gray-400">Processing a return will restore stock for selected items.</p>
             <div className="flex justify-end gap-3 pt-2">
-              <button type="button" onClick={() => setViewItem(null)} className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800">Cancel</button>
-              <button
+              <Button variant="ghost" onClick={() => setViewItem(null)}>Cancel</Button>
+              <Button
+                variant="primary"
                 onClick={handleReturn}
                 disabled={processing || !returnItems.some((i) => i.returnQty > 0)}
-                className="bg-orange-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-orange-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {processing ? 'Processing...' : 'Process Return'}
-              </button>
+              </Button>
             </div>
           </div>
         )}

@@ -3,6 +3,7 @@ import { expensesApi } from '../../services/api.js'
 import Modal from '../../components/Modal.jsx'
 import Spinner from '../../components/Spinner.jsx'
 import Pagination, { PAGE_SIZE } from '../../components/Pagination.jsx'
+import { Button, InputField, Select } from '../../components/index.js'
 import { useToast } from '../../context/ToastContext.jsx'
 import { usePermission } from '../../hooks/usePermission.js'
 
@@ -50,12 +51,12 @@ function Expenses() {
   return (
     <div>
       <div className="flex justify-between items-center mb-4">
-        <select value={categoryFilter} onChange={(e) => { setCategoryFilter(e.target.value); setPage(1) }} className="border rounded-lg px-3 py-2 text-sm">
+        <Select name="categoryFilter" value={categoryFilter} onChange={(e) => { setCategoryFilter(e.target.value); setPage(1) }} className="mb-0">
           <option value="">All Categories</option>
           {expenseCategories.map((c) => <option key={c} value={c}>{c}</option>)}
-        </select>
+        </Select>
         {canWrite && (
-          <button onClick={() => setModalOpen(true)} className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700">+ Add Expense</button>
+          <Button variant="primary" onClick={() => setModalOpen(true)}>+ Add Expense</Button>
         )}
       </div>
 
@@ -74,7 +75,7 @@ function Expenses() {
                       <td className="px-4 py-3">{e.paymentMethod}</td>
                       <td className="px-4 py-3 text-gray-500">{e.reference || '-'}</td>
                       <td className="px-4 py-3 text-gray-500">{new Date(e.createdAt).toLocaleDateString()}</td>
-                      <td className="px-4 py-3">{canExecute && <button onClick={() => handleDelete(e._id)} className="text-red-600 hover:underline text-xs">Delete</button>}</td>
+                      <td className="px-4 py-3">{canExecute && <Button variant="danger" size="sm" onClick={() => handleDelete(e._id)}>Delete</Button>}</td>
                     </tr>
                   ))}
               </tbody>
@@ -86,18 +87,18 @@ function Expenses() {
 
       <Modal isOpen={modalOpen} onClose={() => setModalOpen(false)} title="Add Expense">
           <div className="space-y-4">
-            <input placeholder="Description" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} className="w-full border rounded-lg px-3 py-2 text-sm" />
-            <input type="number" placeholder="Amount" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} className="w-full border rounded-lg px-3 py-2 text-sm" />
-            <select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} className="w-full border rounded-lg px-3 py-2 text-sm">
+            <InputField name="description" placeholder="Description" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
+            <InputField name="amount" type="number" placeholder="Amount" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} />
+            <Select name="category" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}>
               {expenseCategories.map((c) => <option key={c} value={c}>{c}</option>)}
-            </select>
-            <select value={form.paymentMethod} onChange={(e) => setForm({ ...form, paymentMethod: e.target.value })} className="w-full border rounded-lg px-3 py-2 text-sm">
+            </Select>
+            <Select name="paymentMethod" value={form.paymentMethod} onChange={(e) => setForm({ ...form, paymentMethod: e.target.value })}>
               {paymentMethods.map((m) => <option key={m} value={m}>{m}</option>)}
-            </select>
-            <input placeholder="Reference (optional)" value={form.reference} onChange={(e) => setForm({ ...form, reference: e.target.value })} className="w-full border rounded-lg px-3 py-2 text-sm" />
+            </Select>
+            <InputField name="reference" placeholder="Reference (optional)" value={form.reference} onChange={(e) => setForm({ ...form, reference: e.target.value })} />
             <div className="flex justify-end gap-2">
-              <button onClick={() => setModalOpen(false)} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg">Cancel</button>
-              <button onClick={handleCreate} className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700">Save</button>
+              <Button variant="ghost" onClick={() => setModalOpen(false)}>Cancel</Button>
+              <Button variant="primary" onClick={handleCreate}>Save</Button>
             </div>
           </div>
         </Modal>

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { stockCountsApi, productsApi } from '../../services/api.js'
 import Spinner from '../../components/Spinner.jsx'
+import { Button, InputField, Select } from '../../components/index.js'
 import { useToast } from '../../context/ToastContext.jsx'
 
 function StockCounts() {
@@ -81,12 +82,10 @@ function StockCounts() {
 
   return (
     <div>
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Stock Counts</h1>
-        <button onClick={() => setShowModal(true)}
-          className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700">
+      <div className="flex justify-end items-center mb-6">
+        <Button variant="primary" onClick={() => setShowModal(true)}>
           + New Count
-        </button>
+        </Button>
       </div>
 
       {loading ? <Spinner /> : (
@@ -103,7 +102,7 @@ function StockCounts() {
                   </div>
                   <div className="text-right">
                     <p className={`text-sm font-semibold ${count.status === 'completed' ? 'text-green-600' : 'text-yellow-600'}`}>{count.status || 'draft'}</p>
-                    <button onClick={() => viewCount(count._id)} className="text-indigo-600 hover:text-indigo-800 text-xs font-medium">View Details</button>
+                    <Button variant="ghost" size="sm" onClick={() => viewCount(count._id)}>View Details</Button>
                   </div>
                 </div>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-sm">
@@ -129,22 +128,16 @@ function StockCounts() {
               {items.map((item, i) => (
                 <div key={i} className="flex gap-2 items-end p-3 bg-gray-50 rounded-lg">
                   <div className="flex-1">
-                    <label className="block text-xs font-medium text-gray-500 mb-1">Product</label>
-                    <select value={item.productId} onChange={e => handleItemChange(i, 'productId', e.target.value)}
-                      className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                    <Select label="Product" name={`product-${i}`} value={item.productId} onChange={e => handleItemChange(i, 'productId', e.target.value)}>
                       <option value="">Select product</option>
                       {products.map(p => <option key={p._id} value={p._id}>{p.name} (stock: {p.stock || 0})</option>)}
-                    </select>
+                    </Select>
                   </div>
                   <div className="w-20">
-                    <label className="block text-xs font-medium text-gray-500 mb-1">Expected</label>
-                    <input type="number" value={item.expectedQty} readOnly
-                      className="w-full px-2 py-1.5 border border-gray-200 rounded text-sm bg-gray-100" />
+                    <InputField label="Expected" name={`expected-${i}`} type="number" value={item.expectedQty} readOnly />
                   </div>
                   <div className="w-20">
-                    <label className="block text-xs font-medium text-gray-500 mb-1">Actual</label>
-                    <input type="number" value={item.actualQty} onChange={e => handleItemChange(i, 'actualQty', Number(e.target.value))}
-                      className="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                    <InputField label="Actual" name={`actual-${i}`} type="number" value={item.actualQty} onChange={e => handleItemChange(i, 'actualQty', Number(e.target.value))} />
                   </div>
                   <div className="w-16 text-right">
                     <label className="block text-xs font-medium text-gray-500 mb-1">Variance</label>
@@ -152,14 +145,14 @@ function StockCounts() {
                       {item.actualQty - item.expectedQty}
                     </p>
                   </div>
-                  <button onClick={() => handleRemoveItem(i)} className="text-red-500 hover:text-red-700 px-1">&times;</button>
+                  <Button variant="danger" size="sm" onClick={() => handleRemoveItem(i)} className="!p-1">&times;</Button>
                 </div>
               ))}
-              <button onClick={handleAddItem} className="text-indigo-600 hover:text-indigo-800 text-sm font-medium">+ Add Item</button>
+              <Button variant="ghost" size="sm" onClick={handleAddItem}>+ Add Item</Button>
             </div>
             <div className="flex justify-end gap-3 mt-6">
-              <button onClick={() => setShowModal(false)} className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50">Cancel</button>
-              <button onClick={handleSubmit} className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700">Save Count</button>
+              <Button variant="ghost" onClick={() => setShowModal(false)}>Cancel</Button>
+              <Button variant="primary" onClick={handleSubmit}>Save Count</Button>
             </div>
           </div>
         </div>

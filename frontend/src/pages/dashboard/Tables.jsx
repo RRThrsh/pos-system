@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { tablesApi } from '../../services/api.js'
 import Modal from '../../components/Modal.jsx'
 import Spinner from '../../components/Spinner.jsx'
+import { Button, InputField, Select } from '../../components/index.js'
 import { useToast } from '../../context/ToastContext.jsx'
 import { usePermission } from '../../hooks/usePermission.js'
 
@@ -72,7 +73,7 @@ function Tables() {
       <div className="flex justify-between items-center mb-4">
         <h2 className="text-sm text-gray-500">{tables.filter((t) => t.status === 'available').length} available of {tables.length} total</h2>
         {canWrite && (
-          <button onClick={openCreate} className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-indigo-700">+ Add Table</button>
+          <Button variant="primary" onClick={openCreate}>+ Add Table</Button>
         )}
       </div>
 
@@ -94,17 +95,17 @@ function Tables() {
       )}
       <Modal isOpen={modalOpen} onClose={() => setModalOpen(false)} title="Add Table">
         <div className="space-y-4">
-          <input placeholder="Table number (e.g. 1, A2, Patio-3)" value={form.number} onChange={(e) => setForm({ ...form, number: e.target.value })} className="w-full border rounded-lg px-3 py-2 text-sm" />
-          <input type="number" min={1} placeholder="Capacity (seats)" value={form.capacity} onChange={(e) => setForm({ ...form, capacity: e.target.value })} className="w-full border rounded-lg px-3 py-2 text-sm" />
-          <select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })} className="w-full border rounded-lg px-3 py-2 text-sm">
+          <InputField name="number" placeholder="Table number (e.g. 1, A2, Patio-3)" value={form.number} onChange={(e) => setForm({ ...form, number: e.target.value })} />
+          <InputField name="capacity" type="number" min={1} placeholder="Capacity (seats)" value={form.capacity} onChange={(e) => setForm({ ...form, capacity: e.target.value })} />
+          <Select name="status" value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>
             <option value="available">Available</option>
             <option value="occupied">Occupied</option>
             <option value="reserved">Reserved</option>
             <option value="maintenance">Maintenance</option>
-          </select>
+          </Select>
           <div className="flex justify-end gap-2">
-            <button onClick={() => setModalOpen(false)} className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800">Cancel</button>
-            <button onClick={handleCreate} className="px-4 py-2 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">Create</button>
+            <Button variant="ghost" onClick={() => setModalOpen(false)}>Cancel</Button>
+            <Button variant="primary" onClick={handleCreate}>Create</Button>
           </div>
         </div>
       </Modal>
@@ -112,15 +113,15 @@ function Tables() {
       <Modal isOpen={editModalOpen} onClose={() => { setEditModalOpen(false); setSelectedTable(null) }} title={`Table ${selectedTable?.number || ''}`}>
         <div className="space-y-4">
           <div className="text-sm text-gray-500">{selectedTable?.capacity} seats</div>
-          <select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })} className="w-full border rounded-lg px-3 py-2 text-sm">
+          <Select name="editStatus" value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>
             <option value="available">Available</option>
             <option value="occupied">Occupied</option>
             <option value="reserved">Reserved</option>
             <option value="maintenance">Maintenance</option>
-          </select>
+          </Select>
           <div className="flex justify-end gap-2">
-            <button onClick={() => { setEditModalOpen(false); setSelectedTable(null) }} className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800">Cancel</button>
-            <button onClick={handleUpdate} className="px-4 py-2 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">Update Status</button>
+            <Button variant="ghost" onClick={() => { setEditModalOpen(false); setSelectedTable(null) }}>Cancel</Button>
+            <Button variant="primary" onClick={handleUpdate}>Update Status</Button>
           </div>
         </div>
       </Modal>

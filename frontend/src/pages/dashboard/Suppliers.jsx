@@ -3,6 +3,7 @@ import { suppliersApi, productsApi } from '../../services/api.js'
 import Modal from '../../components/Modal.jsx'
 import Spinner from '../../components/Spinner.jsx'
 import Pagination, { PAGE_SIZE } from '../../components/Pagination.jsx'
+import { Button, InputField, Select, Textarea } from '../../components/index.js'
 import { useToast } from '../../context/ToastContext.jsx'
 import { usePermission } from '../../hooks/usePermission.js'
 
@@ -64,7 +65,7 @@ function SupplierProductsModal({ isOpen, onClose, supplier }) {
       <Modal isOpen={isOpen} onClose={onClose} title={`Products - ${supplier?.name || ''}`} size="lg">
         <div className="flex justify-between items-center mb-4">
           <p className="text-sm text-gray-500">{products.length} product(s)</p>
-          <button onClick={() => setPriceModal(true)} className="bg-indigo-600 text-white px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-indigo-500 transition-colors">+ Add Product</button>
+          <Button variant="primary" size="sm" onClick={() => setPriceModal(true)}>+ Add Product</Button>
         </div>
         {loading ? <Spinner /> : (
           <div className="overflow-x-auto">
@@ -100,25 +101,17 @@ function SupplierProductsModal({ isOpen, onClose, supplier }) {
 
       <Modal isOpen={priceModal} onClose={() => setPriceModal(false)} title="Add Product Price">
         <form onSubmit={handleSetPrice} className="space-y-3">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Product</label>
-            <select required value={priceForm.productId} onChange={(e) => setPriceForm({ ...priceForm, productId: e.target.value })}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20">
-              <option value="">Select product...</option>
-              {allProducts.map((p) => (
-                <option key={p._id} value={p._id}>{p.name} ({p.sku})</option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Price</label>
-            <input type="number" required min="0" step="0.01" value={priceForm.price}
-              onChange={(e) => setPriceForm({ ...priceForm, price: e.target.value })}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20" />
-          </div>
+          <Select label="Product" name="productId" required value={priceForm.productId} onChange={(e) => setPriceForm({ ...priceForm, productId: e.target.value })}>
+            <option value="">Select product...</option>
+            {allProducts.map((p) => (
+              <option key={p._id} value={p._id}>{p.name} ({p.sku})</option>
+            ))}
+          </Select>
+          <InputField label="Price" name="price" type="number" required min="0" step="0.01" value={priceForm.price}
+            onChange={(e) => setPriceForm({ ...priceForm, price: e.target.value })} />
           <div className="flex justify-end gap-3 pt-2">
-            <button type="button" onClick={() => setPriceModal(false)} className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800">Cancel</button>
-            <button type="submit" className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-indigo-500 transition-colors">Set Price</button>
+            <Button variant="ghost" onClick={() => setPriceModal(false)}>Cancel</Button>
+            <Button variant="primary" type="submit">Set Price</Button>
           </div>
         </form>
       </Modal>
@@ -159,15 +152,14 @@ function CompareModal({ isOpen, onClose }) {
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Compare Supplier Prices" size="lg">
       <div className="flex gap-3 mb-4">
-        <select value={selectedProduct} onChange={(e) => { setSelectedProduct(e.target.value); setComparison([]) }}
-          className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20">
+        <Select name="compareProduct" value={selectedProduct} onChange={(e) => { setSelectedProduct(e.target.value); setComparison([]) }}
+          className="flex-1 mb-0">
           <option value="">Select a product...</option>
           {allProducts.map((p) => (
             <option key={p._id} value={p._id}>{p.name} ({p.sku})</option>
           ))}
-        </select>
-        <button onClick={handleCompare} disabled={!selectedProduct}
-          className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-indigo-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">Compare</button>
+        </Select>
+        <Button variant="primary" onClick={handleCompare} disabled={!selectedProduct}>Compare</Button>
       </div>
 
       {loading ? <Spinner /> : comparison.length > 0 && (
@@ -280,12 +272,12 @@ function Suppliers() {
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
-        <input type="text" placeholder="Search suppliers..." value={search}
+        <InputField name="search" placeholder="Search suppliers..." value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="w-full max-w-xs rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20" />
+          className="max-w-xs mb-0" />
         <div className="flex gap-2">
-          <button onClick={() => setCompareModal(true)} className="border border-indigo-600 text-indigo-600 px-4 py-2 rounded-lg text-sm font-semibold hover:bg-indigo-50 transition-colors">Compare Prices</button>
-          {canWrite && <button onClick={openCreate} className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-indigo-500 transition-colors">+ Add Supplier</button>}
+          <Button variant="secondary" size="sm" onClick={() => setCompareModal(true)}>Compare Prices</Button>
+          {canWrite && <Button variant="primary" onClick={openCreate}>+ Add Supplier</Button>}
         </div>
       </div>
 
@@ -312,9 +304,9 @@ function Suppliers() {
                   <td className="px-4 py-3 text-gray-600 max-w-[200px] truncate">{item.address}</td>
                   <td className="px-4 py-3 text-center">
                     <div className="flex items-center justify-center gap-2">
-                      {canWrite && <button onClick={() => openEdit(item)} className="text-indigo-600 hover:text-indigo-800 text-sm">Edit</button>}
-                      <button onClick={() => openProducts(item)} className="text-blue-600 hover:text-blue-800 text-sm">Products</button>
-                      {canExecute && <button onClick={() => handleDelete(item._id || item.id)} className="text-red-600 hover:text-red-800 text-sm">Delete</button>}
+                      {canWrite && <Button variant="ghost" size="sm" onClick={() => openEdit(item)}>Edit</Button>}
+                      <Button variant="ghost" size="sm" onClick={() => openProducts(item)}>Products</Button>
+                      {canExecute && <Button variant="danger" size="sm" onClick={() => handleDelete(item._id || item.id)}>Delete</Button>}
                     </div>
                   </td>
                 </tr>
@@ -330,36 +322,16 @@ function Suppliers() {
 
       <Modal isOpen={modalOpen} onClose={() => setModalOpen(false)} title={editing ? 'Edit Supplier' : 'Add Supplier'}>
         <form onSubmit={handleSave} className="space-y-3">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
-            <input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20" />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Contact Person</label>
-            <input value={form.contact} onChange={(e) => setForm({ ...form, contact: e.target.value })}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20" />
-          </div>
+          <InputField label="Name" name="name" required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+          <InputField label="Contact Person" name="contact" value={form.contact} onChange={(e) => setForm({ ...form, contact: e.target.value })} />
           <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
-              <input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
-              <input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20" />
-            </div>
+            <InputField label="Phone" name="phone" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
+            <InputField label="Email" name="email" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
           </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Address</label>
-            <textarea value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} rows={2}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20" />
-          </div>
+          <Textarea label="Address" name="address" value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} rows={2} />
           <div className="flex justify-end gap-3 pt-2">
-            <button type="button" onClick={() => setModalOpen(false)} className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800">Cancel</button>
-            <button type="submit" className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-indigo-500 transition-colors">{editing ? 'Update' : 'Create'}</button>
+            <Button variant="ghost" onClick={() => setModalOpen(false)}>Cancel</Button>
+            <Button variant="primary" type="submit">{editing ? 'Update' : 'Create'}</Button>
           </div>
         </form>
       </Modal>

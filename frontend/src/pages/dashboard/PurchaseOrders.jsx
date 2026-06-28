@@ -3,6 +3,7 @@ import { purchaseOrdersApi, suppliersApi, productsApi } from '../../services/api
 import Modal from '../../components/Modal.jsx'
 import Spinner from '../../components/Spinner.jsx'
 import Pagination, { PAGE_SIZE } from '../../components/Pagination.jsx'
+import { Button, InputField, Select, Textarea } from '../../components/index.js'
 import { useToast } from '../../context/ToastContext.jsx'
 import { usePermission } from '../../hooks/usePermission.js'
 
@@ -110,17 +111,17 @@ function PurchaseOrders() {
     <div>
       <div className="flex justify-between items-center mb-4">
         <div className="flex gap-2">
-          <select value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); setPage(1) }} className="border rounded-lg px-3 py-2 text-sm">
+          <Select name="statusFilter" value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); setPage(1) }} className="mb-0">
             <option value="">All Statuses</option>
             <option value="pending">Pending</option>
             <option value="ordered">Ordered</option>
             <option value="partially-received">Partially Received</option>
             <option value="received">Received</option>
             <option value="cancelled">Cancelled</option>
-          </select>
+          </Select>
         </div>
         {canWrite && (
-          <button onClick={openCreate} className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700">+ New Purchase Order</button>
+          <Button variant="primary" onClick={openCreate}>+ New Purchase Order</Button>
         )}
       </div>
 
@@ -141,14 +142,14 @@ function PurchaseOrders() {
                       <td className="px-4 py-3 flex gap-2">
                         {canExecute && o.status === 'pending' && (
                           <>
-                            <button onClick={() => handleStatus(o._id, 'ordered')} className="text-blue-600 hover:underline text-xs">Order</button>
-                            <button onClick={() => handleStatus(o._id, 'cancelled')} className="text-red-600 hover:underline text-xs">Cancel</button>
+                            <Button variant="ghost" size="sm" onClick={() => handleStatus(o._id, 'ordered')}>Order</Button>
+                            <Button variant="ghost" size="sm" onClick={() => handleStatus(o._id, 'cancelled')}>Cancel</Button>
                           </>
                         )}
                         {(canExecute && (o.status === 'ordered' || o.status === 'partially-received')) && (
-                          <button onClick={() => openReceive(o)} className="text-green-600 hover:underline text-xs">{o.status === 'partially-received' ? 'Receive More' : 'Receive'}</button>
+                          <Button variant="ghost" size="sm" onClick={() => openReceive(o)}>{o.status === 'partially-received' ? 'Receive More' : 'Receive'}</Button>
                         )}
-                        {canExecute && <button onClick={() => handleDelete(o._id)} className="text-red-600 hover:underline text-xs">Delete</button>}
+                        {canExecute && <Button variant="danger" size="sm" onClick={() => handleDelete(o._id)}>Delete</Button>}
                       </td>
                     </tr>
                   ))}
@@ -165,60 +166,52 @@ function PurchaseOrders() {
             <div key={i} className="flex gap-2 items-end p-3 bg-gray-50 rounded-lg">
               <div className="flex-1"><p className="text-sm font-medium text-gray-700">{item.productName}</p><p className="text-xs text-gray-500">Ordered: {item.expectedQty} | Already received: {item.receivedQty}</p></div>
               <div className="w-24">
-                <label className="text-xs text-gray-500">Receive Qty</label>
-                <input type="number" min={0} max={item.expectedQty - item.receivedQty} value={item.receiveQty}
-                  onChange={(e) => { const updated = [...receiveItems]; updated[i].receiveQty = Math.min(Number(e.target.value), item.expectedQty - item.receivedQty); setReceiveItems(updated) }}
-                  className="w-full border rounded-lg px-3 py-2 text-sm" />
+                <InputField label="Receive Qty" name={`receiveQty-${i}`} type="number" min={0} max={item.expectedQty - item.receivedQty} value={item.receiveQty}
+                  onChange={(e) => { const updated = [...receiveItems]; updated[i].receiveQty = Math.min(Number(e.target.value), item.expectedQty - item.receivedQty); setReceiveItems(updated) }} />
               </div>
             </div>
           ))}
           <div className="flex justify-end gap-2">
-            <button onClick={() => setReceiveModal(null)} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg">Cancel</button>
-            <button onClick={handleReceive} className="px-4 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700">Receive Items</button>
+            <Button variant="ghost" onClick={() => setReceiveModal(null)}>Cancel</Button>
+            <Button variant="primary" onClick={handleReceive}>Receive Items</Button>
           </div>
         </div>
       </Modal>
 
       <Modal isOpen={modalOpen} onClose={() => setModalOpen(false)} title="New Purchase Order">
           <div className="space-y-4">
-            <select value={selectedSupplier} onChange={(e) => setSelectedSupplier(e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm">
+            <Select name="selectedSupplier" value={selectedSupplier} onChange={(e) => setSelectedSupplier(e.target.value)}>
               <option value="">Select Supplier</option>
               {suppliers.map((s) => <option key={s._id} value={s._id}>{s.name}</option>)}
-            </select>
+            </Select>
 
             {items.map((item, i) => (
               <div key={i} className="flex gap-2 items-end">
                 <div className="flex-1">
-                  <label className="text-xs text-gray-500">Product</label>
-                  <select value={item.productId} onChange={(e) => updateItem(i, 'productId', e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm">
+                  <Select label="Product" name={`product-${i}`} value={item.productId} onChange={(e) => updateItem(i, 'productId', e.target.value)}>
                     <option value="">Select Product</option>
                     {products.map((p) => <option key={p._id} value={p._id}>{p.name}</option>)}
-                  </select>
+                  </Select>
                 </div>
                 <div className="w-20">
-                  <label className="text-xs text-gray-500">Qty</label>
-                  <input type="number" min={1} value={item.qty} onChange={(e) => updateItem(i, 'qty', e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm" />
+                  <InputField label="Qty" name={`qty-${i}`} type="number" min={1} value={item.qty} onChange={(e) => updateItem(i, 'qty', e.target.value)} />
                 </div>
                 <div className="w-24">
-                  <label className="text-xs text-gray-500">Unit Cost</label>
-                  <input type="number" min={0} step="0.01" value={item.unitCost} onChange={(e) => updateItem(i, 'unitCost', e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm" />
+                  <InputField label="Unit Cost" name={`unitCost-${i}`} type="number" min={0} step="0.01" value={item.unitCost} onChange={(e) => updateItem(i, 'unitCost', e.target.value)} />
                 </div>
                 <div className="w-20 pt-5 text-sm font-medium">₱{Number(item.total).toLocaleString()}</div>
                 {items.length > 1 && <button onClick={() => removeItem(i)} className="text-red-500 pt-5 text-lg">&times;</button>}
               </div>
             ))}
-            <button onClick={addItem} className="text-blue-600 text-sm hover:underline">+ Add Item</button>
+            <Button variant="ghost" size="sm" onClick={addItem}>+ Add Item</Button>
 
             <div className="text-right font-semibold">Subtotal: ₱{subtotal.toLocaleString()}</div>
 
-            <div>
-              <label className="text-xs text-gray-500">Notes</label>
-              <textarea value={notes} onChange={(e) => setNotes(e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm" rows={2} />
-            </div>
+            <Textarea label="Notes" name="notes" value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} />
 
             <div className="flex justify-end gap-2">
-              <button onClick={() => setModalOpen(false)} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg">Cancel</button>
-              <button onClick={handleCreate} className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700">Create</button>
+              <Button variant="ghost" onClick={() => setModalOpen(false)}>Cancel</Button>
+              <Button variant="primary" onClick={handleCreate}>Create</Button>
             </div>
           </div>
         </Modal>
