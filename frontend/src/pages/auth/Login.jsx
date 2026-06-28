@@ -54,7 +54,10 @@ function Login() {
         localStorage.removeItem('remembered_username')
       }
       const fallback = user?.role === 'cashier' ? '/cashier' : '/dashboard'
-      const from = location.state?.from?.pathname || fallback
+      let from = location.state?.from?.pathname || fallback
+      if (user?.role === 'cashier' && from.startsWith('/dashboard')) {
+        from = '/cashier'
+      }
       navigate(from, { replace: true })
     } catch (err) {
       setError(err.response?.message || err.message || 'Invalid username or password.')

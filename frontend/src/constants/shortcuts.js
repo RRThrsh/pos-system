@@ -4,6 +4,7 @@ const DEFAULT_SHORTCUTS = {
   quickKeys: { key: 'F4', label: 'Toggle Quick Keys', description: 'Show/hide quick product buttons' },
   close: { key: 'Escape', label: 'Close Modals', description: 'Close receipt or held orders panel' },
   fullscreen: { key: 'F11', label: 'Toggle Fullscreen', description: 'Toggle fullscreen mode' },
+  logout: { key: 'F12', label: 'Logout', description: 'Log out of the POS' },
 }
 
 export function getDefaultShortcuts() {
@@ -16,4 +17,5 @@ export const SHORTCUT_ACTIONS = [
   { id: 'quickKeys', label: 'Toggle Quick Keys', description: 'Show or hide quick product buttons panel' },
   { id: 'close', label: 'Close Modals', description: 'Close receipt modal or held orders panel' },
   { id: 'fullscreen', label: 'Toggle Fullscreen', description: 'Enter or exit fullscreen mode' },
+  { id: 'logout', label: 'Logout', description: 'Log out of the POS' },
 ]

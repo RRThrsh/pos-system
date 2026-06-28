@@ -2,10 +2,12 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { productsApi, salesApi, promoCodesApi, configApi, heldOrdersApi, categoriesApi } from '../../services/api.js'
 import Modal from '../../components/Modal.jsx'
 import { useToast } from '../../context/ToastContext.jsx'
+import { useAuth } from '../../context/AuthContext.jsx'
 import { getDefaultShortcuts } from '../../constants/shortcuts.js'
 
 function Pos() {
   const { addToast } = useToast()
+  const { logout } = useAuth()
   const barcodeRef = useRef(null)
   const handleCheckoutRef = useRef()
   const handleBarcodeRef = useRef()
@@ -312,6 +314,7 @@ function Pos() {
       if (e.key === s.quickKeys?.key) { e.preventDefault(); setShowQuickKeys(prev => !prev) }
       if (e.key === s.close?.key) { e.preventDefault(); setShowReceipt(false); setShowHeldOrders(false) }
       if (e.key === s.fullscreen?.key) { e.preventDefault(); toggleFullscreen() }
+      if (e.key === s.logout?.key) { e.preventDefault(); logout() }
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
@@ -332,6 +335,9 @@ function Pos() {
           </div>
           <div className="flex items-center gap-2">
             <button onClick={() => setShowQuickKeys(!showQuickKeys)} className={`px-3 py-2 text-sm rounded-lg transition-colors ${showQuickKeys ? 'bg-indigo-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}>Quick Keys ({shortcuts.quickKeys?.key || 'F4'})</button>
+            <button onClick={logout} className="px-3 py-2 text-sm rounded-lg bg-gray-200 text-gray-700 hover:bg-red-100 hover:text-red-600 transition-colors" title={`Logout (${shortcuts.logout?.key || 'F12'})`}>
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0 0 13.5 3h-6a2.25 2.25 0 0 0-2.25 2.25v13.5A2.25 2.25 0 0 0 7.5 21h6a2.25 2.25 0 0 0 2.25-2.25V15m3 0 3-3m0 0-3-3m3 3H9" /></svg>
+            </button>
           </div>
         </div>
 
