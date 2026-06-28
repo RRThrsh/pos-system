@@ -35,6 +35,7 @@ function App() {
         <AuthProvider>
           <Routes>
             <Route path="/login" element={<Login />} />
+            <Route path="/cashier" element={<ProtectedRoute><Pos /></ProtectedRoute>} />
             <Route
               element={
                 <ProtectedRoute>

@@ -1,10 +1,11 @@
 import { useState, useRef, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext.jsx'
 import { authApi } from '../../services/api.js'
 
 function Login() {
   const navigate = useNavigate()
+  const location = useLocation()
   const { login } = useAuth()
   const usernameRef = useRef(null)
   const emailRef = useRef(null)
@@ -52,7 +53,8 @@ function Login() {
       } else {
         localStorage.removeItem('remembered_username')
       }
-      navigate('/dashboard')
+      const from = location.state?.from?.pathname || '/dashboard'
+      navigate(from, { replace: true })
     } catch (err) {
       setError(err.response?.message || err.message || 'Invalid username or password.')
     } finally {
