@@ -27,7 +27,6 @@ function Pos() {
   const [taxRate, setTaxRate] = useState(0)
   const taxRateLoaded = useRef(false)
 
-  const [orderNotes, setOrderNotes] = useState('')
   const [currentTid, setCurrentTid] = useState('')
 
   const generateTid = () => `#${Math.random().toString(36).slice(2, 12).toUpperCase()}`
@@ -101,7 +100,7 @@ function Pos() {
     setCart((prev) => {
       const existing = prev.find((c) => (c._id || c.id) === (product._id || product.id))
       if (existing) return prev.map((c) => (c._id || c.id) === (product._id || product.id) ? { ...c, quantity: Math.min(c.quantity + 1, product.stock || 99) } : c)
-      return [...prev, { ...product, quantity: 1, notes: '' }]
+      return [...prev, { ...product, quantity: 1 }]
     })
     setSearch(''); setResults([])
   }
@@ -115,20 +114,10 @@ function Pos() {
     }).filter((c) => c.quantity > 0))
   }
 
-  const removeFromCart = (id) => setCart((prev) => prev.filter((c) => (c._id || c.id) !== id))
-
   const clearCart = () => {
     if (!cart.length) return
     setCart([])
     addToast('Cart cleared', 'info')
-  }
-
-  const updateCartItemNote = (id, notes) => setCart((prev) => prev.map((c) => (c._id || c.id) === id ? { ...c, notes } : c))
-
-  const updateCartItemPrice = (id, price) => {
-    const p = parseFloat(price)
-    if (isNaN(p) || p < 0) return
-    setCart((prev) => prev.map((c) => (c._id || c.id) === id ? { ...c, price: p } : c))
   }
 
   const subtotal = cart.reduce((sum, c) => sum + c.price * c.quantity, 0)
@@ -163,7 +152,7 @@ function Pos() {
     try {
       const res = await heldOrdersApi.getById(order._id || order.id)
       if (res && res.items) {
-        setCart(res.items.map((i) => ({ _id: i.productId, id: i.productId, productId: i.productId, name: i.productName, price: i.price, quantity: i.qty || i.quantity, notes: i.notes || '' })))
+        setCart(res.items.map((i) => ({ _id: i.productId, id: i.productId, productId: i.productId, name: i.productName, price: i.price, quantity: i.qty || i.quantity })))
       }
       await heldOrdersApi.remove(order._id || order.id)
       setHeldOrders((prev) => prev.filter((o) => (o._id || o.id) !== (order._id || order.id)))
@@ -177,22 +166,20 @@ function Pos() {
     try {
       const tid = currentTid || generateTid()
       const sale = await salesApi.create({
-        items: cart.map((c) => ({ productId: c._id || c.id, qty: c.quantity, notes: c.notes })),
+        items: cart.map((c) => ({ productId: c._id || c.id, qty: c.quantity })),
         transactionId: tid,
         paymentMethod, amountPaid: parseFloat(amountPaid) || total,
         discount: discValue, discountType, orderType: 'walk-in',
         promoCode: promoCode || undefined, tax: taxAmount || undefined, taxRate: taxRate || undefined,
-        notes: orderNotes || undefined,
       })
       addToast('Sale completed!', 'success')
       setLastSale({
         ...sale, items: cart, subtotal, discount: discAmount + promoDiscount, tax: taxAmount, taxRate, total,
         paymentMethod, amountPaid: parseFloat(amountPaid) || total, change: change > 0 ? change : 0,
         orderType: 'walk-in', transactionId: tid,
-        promoCode: promoCode || undefined, notes: orderNotes, receiptNumber: sale.receiptNumber,
+        promoCode: promoCode || undefined, receiptNumber: sale.receiptNumber,
       })
       setCart([]); setCurrentTid(''); setAmountPaid(''); setDiscount(''); setPromoCode(''); setPromoDiscount(0)
-      setOrderNotes('')
       setShowReceipt(true)
     } catch (err) { addToast(err.message || 'Checkout failed', 'error') }
     finally { setSubmitting(false) }
@@ -238,7 +225,6 @@ function Pos() {
         ${s.transactionId ? `<p class="sub">Txn: ${s.transactionId}</p>` : ''}
         <div class="line"></div>
         <table>${itemsHtml}</table>
-        ${s.notes ? `<p class="small">${s.notes}</p>` : ''}
         <div class="line"></div>
         <table>
           <tr><td>Subtotal</td><td style="text-align:right">&#8369;${s.subtotal.toLocaleString()}</td></tr>
@@ -304,27 +290,6 @@ function Pos() {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            {cart.length > 0 && (
-              <>
-                <button onClick={clearCart} className="px-3 py-2 text-sm bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors">Clear</button>
-                <button onClick={handleHoldOrder} className="px-3 py-2 text-sm bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors">Hold Order</button>
-              </>
-            )}
-            <div className="relative">
-              <button onClick={() => setShowHeldOrders(!showHeldOrders)} className="px-3 py-2 text-sm bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors">Held ({heldOrders.length})</button>
-              {showHeldOrders && (
-                <div className="absolute right-0 mt-2 w-72 bg-white rounded-lg shadow-lg border border-gray-200 z-50 max-h-80 overflow-auto">
-                  <div className="px-4 py-3 border-b border-gray-100 font-semibold text-sm text-gray-800">Held Orders</div>
-                  {heldOrders.length === 0 ? <p className="text-sm text-gray-500 text-center py-6">No held orders.</p> : heldOrders.map((o) => (
-                    <button key={o._id || o.id} onClick={() => recallOrder(o)} className="w-full text-left px-4 py-3 border-b border-gray-50 hover:bg-gray-50 transition-colors">
-                      <div className="text-sm font-medium text-gray-800">Walk-in</div>
-                      <div className="text-xs text-gray-500">{o.items?.length || 0} items &middot; &#8369;{Number(o.subtotal || 0).toLocaleString()}</div>
-                      <div className="text-xs text-gray-400">{new Date(o.createdAt).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</div>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
             <button onClick={() => setShowQuickKeys(!showQuickKeys)} className={`px-3 py-2 text-sm rounded-lg transition-colors ${showQuickKeys ? 'bg-indigo-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}>Quick Keys ({shortcuts.quickKeys?.key || 'F4'})</button>
           </div>
         </div>
@@ -393,17 +358,13 @@ function Pos() {
                   <th className="text-center px-4 py-3 font-medium">Price</th>
                   <th className="text-center px-4 py-3 font-medium">Qty</th>
                   <th className="text-right px-4 py-3 font-medium">Subtotal</th>
-                  <th className="text-center px-4 py-3 font-medium">Notes</th>
-                  <th className="text-center px-4 py-3 font-medium"></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {cart.map((c) => (
                   <tr key={c._id || c.id}>
                     <td className="px-4 py-3 font-medium text-gray-900">{c.name}</td>
-                    <td className="px-4 py-3 text-center">
-                      <input type="number" step="0.01" min="0" value={c.price} onChange={(e) => updateCartItemPrice(c._id || c.id, e.target.value)} className="w-24 text-center border border-gray-200 rounded px-2 py-1 text-sm" />
-                    </td>
+                    <td className="px-4 py-3 text-center font-medium">&#8369;{Number(c.price).toLocaleString()}</td>
                     <td className="px-4 py-3 text-center">
                       <div className="flex items-center justify-center gap-2">
                         <button onClick={() => updateQty(c._id || c.id, -1)} className="w-7 h-7 rounded-full border border-gray-300 text-gray-500 hover:bg-gray-100 transition-colors">-</button>
@@ -421,12 +382,6 @@ function Pos() {
                       </div>
                     </td>
                     <td className="px-4 py-3 text-right font-medium">&#8369;{(c.price * c.quantity).toLocaleString()}</td>
-                    <td className="px-4 py-3 text-center">
-                      <input value={c.notes || ''} onChange={(e) => updateCartItemNote(c._id || c.id, e.target.value)} placeholder="notes" className="w-20 text-xs border border-gray-200 rounded px-1 py-1" />
-                    </td>
-                    <td className="px-4 py-3 text-center">
-                      <button onClick={() => removeFromCart(c._id || c.id)} className="text-red-500 hover:text-red-700 transition-colors">&times;</button>
-                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -472,10 +427,6 @@ function Pos() {
             </div>
           </div>
 
-          <div className="mb-3">
-            <label className="block text-sm font-medium text-gray-700 mb-1">Order Notes</label>
-            <textarea value={orderNotes} onChange={(e) => setOrderNotes(e.target.value)} placeholder="Notes for this transaction..." rows={2} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none" />
-          </div>
 
           <div className="flex-1">
             <div className="text-sm text-gray-500 space-y-1 mb-4">
@@ -499,7 +450,13 @@ function Pos() {
             {paymentMethod === 'cash' && (
               <div className="mb-3">
                 <label className="block text-sm font-medium text-gray-700 mb-1">Amount Paid</label>
-                <input type="number" step="0.01" min="0" value={amountPaid} onChange={(e) => setAmountPaid(e.target.value.replace(/[^0-9.]/g, ''))} placeholder="0.00" className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none" />
+                <input type="text" inputMode="decimal" value={amountPaid}
+                  onChange={(e) => {
+                    const v = e.target.value.replace(/[^0-9.]/g, '').replace(/(\..*)\./g, '$1')
+                    if (parseFloat(v) > 999999.99) return
+                    setAmountPaid(v)
+                  }}
+                  placeholder="0.00" className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none" />
               </div>
             )}
 
@@ -511,10 +468,34 @@ function Pos() {
             )}
           </div>
 
-          <button onClick={handleCheckout}
-            disabled={!cart.length || submitting || (paymentMethod === 'cash' && (!amountPaid || parseFloat(amountPaid) < total))}
-            className="w-full bg-green-600 text-white py-3 rounded-lg text-sm font-bold shadow-sm hover:bg-green-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >{submitting ? 'Processing...' : `Charge  \u20B1${total.toLocaleString()} (${shortcuts.charge?.key || 'F2'})`}</button>
+          <div className="flex gap-2 mb-2">
+            <button onClick={handleHoldOrder} disabled={!cart.length} className="flex-1 px-3 py-2 text-sm bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">Hold Order</button>
+            <div className="relative flex-1">
+              <button onClick={() => setShowHeldOrders(!showHeldOrders)} className="w-full px-3 py-2 text-sm bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors">Held ({heldOrders.length})</button>
+              {showHeldOrders && (
+                <div className="absolute right-0 mt-2 w-72 bg-white rounded-lg shadow-lg border border-gray-200 z-50 max-h-80 overflow-auto">
+                  <div className="px-4 py-3 border-b border-gray-100 font-semibold text-sm text-gray-800">Held Orders</div>
+                  {heldOrders.length === 0 ? <p className="text-sm text-gray-500 text-center py-6">No held orders.</p> : heldOrders.map((o) => (
+                    <button key={o._id || o.id} onClick={() => recallOrder(o)} className="w-full text-left px-4 py-3 border-b border-gray-50 hover:bg-gray-50 transition-colors">
+                      <div className="text-sm font-medium text-gray-800">Walk-in</div>
+                      <div className="text-xs text-gray-500">{o.items?.length || 0} items &middot; &#8369;{Number(o.subtotal || 0).toLocaleString()}</div>
+                      <div className="text-xs text-gray-400">{new Date(o.createdAt).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <button onClick={clearCart}
+              disabled={!cart.length}
+              className="flex-1 bg-red-500 text-white py-3 rounded-lg text-sm font-bold shadow-sm hover:bg-red-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >Void</button>
+            <button onClick={handleCheckout}
+              disabled={!cart.length || submitting || (paymentMethod === 'cash' && (!amountPaid || parseFloat(amountPaid) < total))}
+              className="flex-1 bg-green-600 text-white py-3 rounded-lg text-sm font-bold shadow-sm hover:bg-green-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >{submitting ? 'Processing...' : `Charge  \u20B1${total.toLocaleString()} (${shortcuts.charge?.key || 'F2'})`}</button>
+          </div>
         </div>
       </div>
 
