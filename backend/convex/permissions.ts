@@ -6,7 +6,7 @@ const ALL_PAGES = [
   "Inventory", "Reports", "Users", "Suppliers", "Returns",
   "Audit Logs", "Config", "Permissions", "Monitoring",
   "Snapshots", "Analytics", "Purchase Orders", "Expenses",
-  "Promo Codes",
+  "Promo Codes", "Payment Methods",
 ]
 
 const DEFAULT_PERMISSIONS = [
@@ -60,13 +60,17 @@ export const set = mutation({
 
 export const seedDefaults = mutation({
   handler: async (ctx) => {
-    const existing = await ctx.db.query("permissions").first()
-    if (existing) return { seeded: false, message: "Permissions already exist" }
-
     const now = new Date().toISOString()
+    let count = 0
+
     for (const p of DEFAULT_PERMISSIONS) {
-      await ctx.db.insert("permissions", { ...p, updatedAt: now })
+      const existing = await ctx.db.query("permissions").withIndex("by_role_page", (q) => q.eq("role", p.role).eq("page", p.page)).first()
+      if (!existing) {
+        await ctx.db.insert("permissions", { ...p, updatedAt: now })
+        count++
+      }
     }
-    return { seeded: true, count: DEFAULT_PERMISSIONS.length }
+
+    return { seeded: count > 0, count }
   },
 })

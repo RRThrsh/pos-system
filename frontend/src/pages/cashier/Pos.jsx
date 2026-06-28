@@ -17,6 +17,7 @@ function Pos() {
   const [results, setResults] = useState([])
   const [cart, setCart] = useState([])
   const [paymentMethod, setPaymentMethod] = useState('cash')
+  const [paymentDetails, setPaymentDetails] = useState({})
   const [amountPaid, setAmountPaid] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [discount, setDiscount] = useState('')
@@ -212,17 +213,19 @@ function Pos() {
         items: cart.map((c) => ({ productId: c._id || c.id, qty: c.quantity })),
         transactionId: tid,
         paymentMethod, amountPaid: parseFloat(amountPaid) || total,
+        paymentDetails: Object.keys(paymentDetails).length ? paymentDetails : undefined,
         discount: discValue, discountType, orderType: 'walk-in',
         promoCode: promoCode || undefined, tax: taxAmount || undefined, taxRate: taxRate || undefined,
       })
       addToast('Sale completed!', 'success')
       setLastSale({
         ...sale, items: cart, subtotal, discount: discAmount + promoDiscount, tax: taxAmount, taxRate, total,
-        paymentMethod, amountPaid: parseFloat(amountPaid) || total, change: change > 0 ? change : 0,
+        paymentMethod, paymentDetails: Object.keys(paymentDetails).length ? paymentDetails : undefined,
+        amountPaid: parseFloat(amountPaid) || total, change: change > 0 ? change : 0,
         orderType: 'walk-in', transactionId: tid,
         promoCode: promoCode || undefined, receiptNumber: sale.receiptNumber,
       })
-      setCart([]); setCurrentTid(''); setAmountPaid(''); setDiscount(''); setPromoCode(''); setPromoDiscount(0)
+      setCart([]); setCurrentTid(''); setAmountPaid(''); setDiscount(''); setPromoCode(''); setPromoDiscount(0); setPaymentDetails({})
       setShowReceipt(true)
     } catch (err) { addToast(err.message || 'Checkout failed', 'error') }
     finally { setSubmitting(false) }
@@ -517,6 +520,58 @@ function Pos() {
                     setAmountPaid(v)
                   }}
                   placeholder="0.00" className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none" />
+              </div>
+            )}
+
+            {paymentMethod === 'card' && (
+              <div className="mb-3 space-y-2">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Card Type</label>
+                  <select value={paymentDetails.cardType || ''} onChange={(e) => setPaymentDetails((p) => ({ ...p, cardType: e.target.value }))} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none">
+                    <option value="">Select card type</option>
+                    <option value="visa">Visa</option>
+                    <option value="mastercard">Mastercard</option>
+                    <option value="amex">American Express</option>
+                    <option value="jcb">JCB</option>
+                    <option value="other">Other</option>
+                  </select>
+                </div>
+                <div className="flex gap-2">
+                  <div className="flex-1">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Last 4 Digits</label>
+                    <input type="text" maxLength={4} value={paymentDetails.cardLast4 || ''} onChange={(e) => setPaymentDetails((p) => ({ ...p, cardLast4: e.target.value.replace(/\D/g, '').slice(0, 4) }))} placeholder="1234" className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none" />
+                  </div>
+                  <div className="flex-1">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Reference #</label>
+                    <input type="text" value={paymentDetails.cardRef || ''} onChange={(e) => setPaymentDetails((p) => ({ ...p, cardRef: e.target.value }))} placeholder="Auth code" className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none" />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {paymentMethod === 'gcash' && (
+              <div className="mb-3 space-y-2">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Reference Number</label>
+                  <input type="text" value={paymentDetails.gcashRef || ''} onChange={(e) => setPaymentDetails((p) => ({ ...p, gcashRef: e.target.value }))} placeholder="GCash reference #" className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Sender Name (optional)</label>
+                  <input type="text" value={paymentDetails.gcashSender || ''} onChange={(e) => setPaymentDetails((p) => ({ ...p, gcashSender: e.target.value }))} placeholder="Sender's full name" className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none" />
+                </div>
+              </div>
+            )}
+
+            {paymentMethod === 'maya' && (
+              <div className="mb-3 space-y-2">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Reference Number</label>
+                  <input type="text" value={paymentDetails.mayaRef || ''} onChange={(e) => setPaymentDetails((p) => ({ ...p, mayaRef: e.target.value }))} placeholder="Maya reference #" className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Account Name (optional)</label>
+                  <input type="text" value={paymentDetails.mayaAccount || ''} onChange={(e) => setPaymentDetails((p) => ({ ...p, mayaAccount: e.target.value }))} placeholder="Account holder name" className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none" />
+                </div>
               </div>
             )}
 
