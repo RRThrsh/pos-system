@@ -58,6 +58,9 @@ function Login() {
       if (user?.role === 'cashier' && from.startsWith('/dashboard')) {
         from = '/cashier'
       }
+      if (user?.role !== 'cashier' && from === '/cashier') {
+        from = '/dashboard'
+      }
       navigate(from, { replace: true })
     } catch (err) {
       setError(err.response?.message || err.message || 'Invalid username or password.')
