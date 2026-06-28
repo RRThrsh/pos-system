@@ -189,6 +189,13 @@ export const heldOrdersApi = {
   remove: (id) => request(`/held-orders/${id}`, { method: 'DELETE' }),
 }
 
+export const paymentMethodsApi = {
+  getAll: () => request('/payment-methods'),
+  create: (payload) => request('/payment-methods', { method: 'POST', body: JSON.stringify(payload) }),
+  update: (id, payload) => request(`/payment-methods/${id}`, { method: 'PUT', body: JSON.stringify(payload) }),
+  remove: (id) => request(`/payment-methods/${id}`, { method: 'DELETE' }),
+}
+
 export const tablesApi = {
   getAll: () => request('/tables'),
   create: (payload) => request('/tables', { method: 'POST', body: JSON.stringify(payload) }),

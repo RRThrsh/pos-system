@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { promoCodesApi } from '../../services/api.js'
 import Modal from '../../components/Modal.jsx'
 import Spinner from '../../components/Spinner.jsx'
+import { Button, InputField, Select, ConfirmDialog } from '../../components/index.js'
 import { useToast } from '../../context/ToastContext.jsx'
 import { usePermission } from '../../hooks/usePermission.js'
 
@@ -12,6 +13,8 @@ function PromoCodes() {
   const [loading, setLoading] = useState(true)
   const [modalOpen, setModalOpen] = useState(false)
   const [form, setForm] = useState({ code: '', discountType: 'percentage', discountValue: '', minPurchase: '', maxUses: '', expiresAt: '' })
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
+  const [deleteTarget, setDeleteTarget] = useState(null)
 
   const load = () => {
     setLoading(true)
@@ -47,7 +50,6 @@ function PromoCodes() {
   }
 
   const handleDelete = async (id) => {
-    if (!confirm('Delete this promo code?')) return
     try { await promoCodesApi.remove(id); addToast('Promo code deleted', 'success'); load() }
     catch (err) { addToast(err.message || 'Failed to delete', 'error') }
   }
@@ -64,7 +66,7 @@ function PromoCodes() {
       <div className="flex justify-between items-center mb-4">
         <h2 className="text-sm text-gray-500">{codes.filter(isValid).length} active of {codes.length} total</h2>
         {canWrite && (
-          <button onClick={() => setModalOpen(true)} className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700">+ New Promo Code</button>
+          <Button variant="primary" onClick={() => setModalOpen(true)}>+ New Promo Code</Button>
         )}
       </div>
 
@@ -88,11 +90,11 @@ function PromoCodes() {
                     </td>
                     <td className="px-4 py-3 flex gap-2">
                       {canExecute && (
-                        <button onClick={() => handleToggle(c._id, !c.isActive)} className="text-blue-600 hover:underline text-xs">
+                        <Button variant="ghost" size="sm" onClick={() => handleToggle(c._id, !c.isActive)}>
                           {c.isActive ? 'Deactivate' : 'Activate'}
-                        </button>
+                        </Button>
                       )}
-                      {canExecute && <button onClick={() => handleDelete(c._id)} className="text-red-600 hover:underline text-xs">Delete</button>}
+                      {canExecute && <Button variant="danger" size="sm" onClick={() => { setDeleteTarget(c._id); setDeleteConfirmOpen(true) }}>Delete</Button>}
                     </td>
                   </tr>
                 ))}
@@ -103,24 +105,34 @@ function PromoCodes() {
 
       <Modal isOpen={modalOpen} onClose={() => setModalOpen(false)} title="New Promo Code">
           <div className="space-y-4">
-            <input placeholder="Code (e.g. SAVE20)" value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value.toUpperCase() })} className="w-full border rounded-lg px-3 py-2 text-sm font-mono uppercase" />
-            <select value={form.discountType} onChange={(e) => setForm({ ...form, discountType: e.target.value })} className="w-full border rounded-lg px-3 py-2 text-sm">
+            <InputField name="code" placeholder="Code (e.g. SAVE20)" value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value.toUpperCase() })} className="font-mono uppercase" />
+            <Select name="discountType" value={form.discountType} onChange={(e) => setForm({ ...form, discountType: e.target.value })}>
               <option value="percentage">Percentage (%)</option>
               <option value="fixed">Fixed Amount (₱)</option>
-            </select>
-            <input type="number" min={0} step="0.01" placeholder={form.discountType === 'percentage' ? 'Discount %' : 'Discount Amount'} value={form.discountValue} onChange={(e) => setForm({ ...form, discountValue: e.target.value })} className="w-full border rounded-lg px-3 py-2 text-sm" />
-            <input type="number" min={0} placeholder="Min Purchase (optional)" value={form.minPurchase} onChange={(e) => setForm({ ...form, minPurchase: e.target.value })} className="w-full border rounded-lg px-3 py-2 text-sm" />
-            <input type="number" min={1} placeholder="Max Uses (optional)" value={form.maxUses} onChange={(e) => setForm({ ...form, maxUses: e.target.value })} className="w-full border rounded-lg px-3 py-2 text-sm" />
+            </Select>
+            <InputField name="discountValue" type="number" min={0} step="0.01" placeholder={form.discountType === 'percentage' ? 'Discount %' : 'Discount Amount'} value={form.discountValue} onChange={(e) => setForm({ ...form, discountValue: e.target.value })} />
+            <InputField name="minPurchase" type="number" min={0} placeholder="Min Purchase (optional)" value={form.minPurchase} onChange={(e) => setForm({ ...form, minPurchase: e.target.value })} />
+            <InputField name="maxUses" type="number" min={1} placeholder="Max Uses (optional)" value={form.maxUses} onChange={(e) => setForm({ ...form, maxUses: e.target.value })} />
             <div>
               <label className="text-xs text-gray-500">Expires At (optional)</label>
-              <input type="date" value={form.expiresAt} onChange={(e) => setForm({ ...form, expiresAt: e.target.value })} className="w-full border rounded-lg px-3 py-2 text-sm" />
+              <InputField name="expiresAt" type="date" value={form.expiresAt} onChange={(e) => setForm({ ...form, expiresAt: e.target.value })} />
             </div>
             <div className="flex justify-end gap-2">
-              <button onClick={() => setModalOpen(false)} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg">Cancel</button>
-              <button onClick={handleCreate} className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700">Create</button>
+              <Button variant="ghost" onClick={() => setModalOpen(false)}>Cancel</Button>
+              <Button variant="primary" onClick={handleCreate}>Create</Button>
             </div>
           </div>
         </Modal>
+
+      <ConfirmDialog
+        isOpen={deleteConfirmOpen}
+        onClose={() => { setDeleteConfirmOpen(false); setDeleteTarget(null) }}
+        onConfirm={() => { handleDelete(deleteTarget); setDeleteConfirmOpen(false); setDeleteTarget(null) }}
+        title="Delete Promo Code"
+        message="Are you sure you want to delete this promo code? This action cannot be undone."
+        confirmText="Delete"
+        confirmVariant="danger"
+      />
     </div>
   )
 }

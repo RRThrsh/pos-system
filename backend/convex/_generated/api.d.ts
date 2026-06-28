@@ -16,6 +16,7 @@ import type * as expenses from "../expenses.js";
 import type * as heldOrders from "../heldOrders.js";
 import type * as inventory from "../inventory.js";
 import type * as notifications from "../notifications.js";
+import type * as paymentMethods from "../paymentMethods.js";
 import type * as permissions from "../permissions.js";
 import type * as priceHistory from "../priceHistory.js";
 import type * as products from "../products.js";
@@ -43,6 +44,7 @@ declare const fullApi: ApiFromModules<{
   heldOrders: typeof heldOrders;
   inventory: typeof inventory;
   notifications: typeof notifications;
+  paymentMethods: typeof paymentMethods;
   permissions: typeof permissions;
   priceHistory: typeof priceHistory;
   products: typeof products;

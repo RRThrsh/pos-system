@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import Spinner from '../../components/Spinner.jsx'
+import { Button, InputField, ConfirmDialog } from '../../components/index.js'
 import { useToast } from '../../context/ToastContext.jsx'
 import { configApi } from '../../services/api.js'
 import { SHORTCUT_ACTIONS, getDefaultShortcuts } from '../../constants/shortcuts.js'
@@ -16,6 +17,7 @@ function Config() {
   const [shortcutSaving, setShortcutSaving] = useState(false)
   const [resetLoading, setResetLoading] = useState(false)
   const [cacheCleared, setCacheCleared] = useState(false)
+  const [resetConfirmOpen, setResetConfirmOpen] = useState(false)
 
   useEffect(() => {
     Promise.all([
@@ -59,7 +61,6 @@ function Config() {
   }
 
   const handleResetAuditLogs = async () => {
-    if (!window.confirm('Are you sure you want to delete ALL audit logs? This cannot be undone.')) return
     setResetLoading(true)
     try {
       await configApi.resetAuditLogs()
@@ -133,9 +134,9 @@ function Config() {
             </span>
           </div>
           <p className="text-sm text-gray-500 mb-4">When enabled, only superadmins can access the system. All other users will be blocked.</p>
-          <button onClick={toggleMaintenance} className={`px-4 py-2 rounded-lg text-sm font-medium text-white transition-colors ${maintenanceMode ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700'}`}>
+          <Button onClick={toggleMaintenance} variant={maintenanceMode ? 'primary' : 'danger'}>
             {maintenanceMode ? 'Disable Maintenance' : 'Enable Maintenance'}
-          </button>
+          </Button>
         </div>
 
         <div className="bg-white rounded-lg shadow p-6">
@@ -147,9 +148,9 @@ function Config() {
             </span>
           </div>
           <p className="text-sm text-gray-500 mb-4">Control whether new users can register themselves through the registration page.</p>
-          <button onClick={toggleRegistration} className={`px-4 py-2 rounded-lg text-sm font-medium text-white transition-colors ${registrationOpen ? 'bg-red-600 hover:bg-red-700' : 'bg-green-600 hover:bg-green-700'}`}>
+          <Button onClick={toggleRegistration} variant={registrationOpen ? 'danger' : 'primary'}>
             {registrationOpen ? 'Close Registration' : 'Open Registration'}
-          </button>
+          </Button>
         </div>
 
         <div className="bg-white rounded-lg shadow p-6">
@@ -160,9 +161,9 @@ function Config() {
             </svg>
           </div>
           <p className="text-sm text-gray-500 mb-4">Permanently delete all audit log entries. This action cannot be undone.</p>
-          <button onClick={handleResetAuditLogs} disabled={resetLoading} className="px-4 py-2 rounded-lg text-sm font-medium text-white bg-red-600 hover:bg-red-700 disabled:opacity-50 transition-colors">
+          <Button onClick={() => setResetConfirmOpen(true)} disabled={resetLoading} variant="danger">
             {resetLoading ? 'Clearing...' : 'Reset Audit Logs'}
-          </button>
+          </Button>
         </div>
 
         <div className="bg-white rounded-lg shadow p-6">
@@ -173,9 +174,9 @@ function Config() {
             </svg>
           </div>
           <p className="text-sm text-gray-500 mb-4">Clear all locally stored data (tokens, preferences, cached data). You will need to log in again.</p>
-          <button onClick={handleClearCache} disabled={cacheCleared} className="px-4 py-2 rounded-lg text-sm font-medium text-white bg-orange-600 hover:bg-orange-700 disabled:opacity-50 transition-colors">
+          <Button onClick={handleClearCache} disabled={cacheCleared} variant="danger">
             {cacheCleared ? 'Cleared' : 'Clear Cache'}
-          </button>
+          </Button>
         </div>
 
         <div className="bg-white rounded-lg shadow p-6">
@@ -187,12 +188,12 @@ function Config() {
           </div>
           <p className="text-sm text-gray-500 mb-4">Export all system data (users, products, sales, inventory, audit logs). Full backup also includes customers, stock counts, and price history.</p>
           <div className="flex gap-2">
-            <button onClick={() => handleBackup(false)} disabled={backupLoading} className="px-4 py-2 rounded-lg text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 transition-colors">
+            <Button onClick={() => handleBackup(false)} disabled={backupLoading} variant="primary">
               {backupLoading ? 'Exporting...' : 'Download Backup'}
-            </button>
-            <button onClick={() => handleBackup(true)} disabled={fullBackupLoading} className="px-4 py-2 rounded-lg text-sm font-medium text-white bg-gray-700 hover:bg-gray-800 disabled:opacity-50 transition-colors">
+            </Button>
+            <Button onClick={() => handleBackup(true)} disabled={fullBackupLoading} variant="secondary">
               {fullBackupLoading ? 'Exporting...' : 'Full Backup'}
-            </button>
+            </Button>
           </div>
         </div>
 
@@ -211,26 +212,27 @@ function Config() {
                   <span className="font-medium text-gray-800">{action.label}</span>
                   <p className="text-xs text-gray-400">{action.description}</p>
                 </div>
-                <input
+                <InputField
+                  name={`shortcut-${action.id}`}
                   value={shortcuts[action.id]?.key || ''}
                   onChange={(e) => {
                     const val = e.target.value
                     if (val.length <= 20) handleShortcutChange(action.id, val)
                   }}
                   placeholder="Key"
-                  className="w-28 text-center border border-gray-300 rounded-lg px-2 py-1.5 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  className="w-28 text-center font-mono"
                   onKeyDown={(e) => { e.preventDefault(); handleShortcutChange(action.id, e.key); e.target.blur() }}
                 />
               </div>
             ))}
           </div>
           <div className="flex gap-2">
-            <button onClick={handleSaveShortcuts} disabled={shortcutSaving} className="px-4 py-2 rounded-lg text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 transition-colors">
+            <Button onClick={handleSaveShortcuts} disabled={shortcutSaving} variant="primary">
               {shortcutSaving ? 'Saving...' : 'Save Shortcuts'}
-            </button>
-            <button onClick={handleResetShortcuts} className="px-4 py-2 rounded-lg text-sm font-medium text-gray-700 border border-gray-300 hover:bg-gray-50 transition-colors">
+            </Button>
+            <Button onClick={handleResetShortcuts} variant="secondary">
               Reset to Default
-            </button>
+            </Button>
           </div>
         </div>
 
@@ -256,6 +258,16 @@ function Config() {
           )}
         </div>
       </div>
+
+      <ConfirmDialog
+        isOpen={resetConfirmOpen}
+        onClose={() => setResetConfirmOpen(false)}
+        onConfirm={() => { handleResetAuditLogs(); setResetConfirmOpen(false) }}
+        title="Reset Audit Logs"
+        message="Are you sure you want to delete ALL audit logs? This cannot be undone."
+        confirmText="Reset"
+        confirmVariant="danger"
+      />
     </div>
   )
 }

@@ -3,6 +3,7 @@ import { salesApi, productsApi, downloadCSV } from '../../services/api.js'
 import Modal from '../../components/Modal.jsx'
 import Spinner from '../../components/Spinner.jsx'
 import Pagination, { PAGE_SIZE } from '../../components/Pagination.jsx'
+import { Button, ConfirmDialog } from '../../components/index.js'
 import { useToast } from '../../context/ToastContext.jsx'
 import { usePermission } from '../../hooks/usePermission.js'
 
@@ -14,6 +15,9 @@ function SalesHistory() {
   const [loading, setLoading] = useState(true)
   const [viewItem, setViewItem] = useState(null)
   const [page, setPage] = useState(1)
+  const [csvConfirmOpen, setCsvConfirmOpen] = useState(false)
+  const [voidConfirmOpen, setVoidConfirmOpen] = useState(false)
+  const [voidTarget, setVoidTarget] = useState(null)
 
   const load = () => {
     setLoading(true)
@@ -35,7 +39,6 @@ function SalesHistory() {
   useEffect(() => { load() }, [])
 
   const handleVoid = async (id) => {
-    if (!confirm('Void this sale? This action cannot be undone.')) return
     try {
       await salesApi.voidSale(id)
       addToast('Sale voided', 'success')
@@ -65,7 +68,7 @@ function SalesHistory() {
   return (
     <div>
       <div className="flex justify-end mb-4">
-        <button onClick={() => downloadCSV(['date', 'transactionId', 'orderType', 'items', 'total', 'profit', 'payment', 'status'], items.map((s) => ({ date: s.createdAt, transactionId: s.transactionId, orderType: s.orderType, items: s.items?.reduce((a, i) => a + (i.qty || i.quantity || 0), 0), total: s.total, profit: calcProfit(s), payment: s.paymentMethod, status: s.status })), `sales-${new Date().toISOString().slice(0, 10)}.csv`)} className="border border-gray-300 text-gray-600 px-4 py-2 rounded-lg text-sm hover:bg-gray-50 min-w-[120px]">Export CSV</button>
+        <Button variant="secondary" size="sm" onClick={() => setCsvConfirmOpen(true)}>Export CSV</Button>
       </div>
 
       {loading ? <Spinner /> : (
@@ -100,9 +103,9 @@ function SalesHistory() {
                     </span>
                   </td>
                   <td className="px-4 py-3 text-center">
-                    <button onClick={() => setViewItem(sale)} className="text-indigo-600 hover:text-indigo-800 mr-3">View</button>
+                    <Button variant="ghost" size="sm" onClick={() => setViewItem(sale)}>View</Button>
                     {sale.status !== 'voided' && canExecute && (
-                      <button onClick={() => handleVoid(sale._id || sale.id)} className="text-red-600 hover:text-red-800">Void</button>
+                      <Button variant="danger" size="sm" onClick={() => { setVoidTarget(sale._id || sale.id); setVoidConfirmOpen(true) }}>Void</Button>
                     )}
                   </td>
                 </tr>
@@ -115,6 +118,25 @@ function SalesHistory() {
           <Pagination items={items} currentPage={page} onPageChange={setPage} />
         </div>
       )}
+
+      <ConfirmDialog
+        isOpen={csvConfirmOpen}
+        onClose={() => setCsvConfirmOpen(false)}
+        onConfirm={() => { downloadCSV(['date', 'transactionId', 'orderType', 'items', 'total', 'profit', 'payment', 'status'], items.map((s) => ({ date: s.createdAt, transactionId: s.transactionId, orderType: s.orderType, items: s.items?.reduce((a, i) => a + (i.qty || i.quantity || 0), 0), total: s.total, profit: calcProfit(s), payment: s.paymentMethod, status: s.status })), `sales-${new Date().toISOString().slice(0, 10)}.csv`); setCsvConfirmOpen(false) }}
+        title="Export Sales CSV"
+        message="You are about to export all loaded sales records to a CSV file. This may contain a large amount of data."
+        confirmText="Export"
+      />
+
+      <ConfirmDialog
+        isOpen={voidConfirmOpen}
+        onClose={() => { setVoidConfirmOpen(false); setVoidTarget(null) }}
+        onConfirm={() => { handleVoid(voidTarget); setVoidConfirmOpen(false); setVoidTarget(null) }}
+        title="Void Sale"
+        message="Are you sure you want to void this sale? This action cannot be undone."
+        confirmText="Void"
+        confirmVariant="danger"
+      />
 
       <Modal isOpen={!!viewItem} onClose={() => setViewItem(null)} title="Sale Details">
         {viewItem && (

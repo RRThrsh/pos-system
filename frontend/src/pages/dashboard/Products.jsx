@@ -3,6 +3,7 @@ import { productsApi, categoriesApi, downloadCSV } from '../../services/api.js'
 import Modal from '../../components/Modal.jsx'
 import Spinner from '../../components/Spinner.jsx'
 import Pagination, { PAGE_SIZE } from '../../components/Pagination.jsx'
+import { Button, InputField, Select, ConfirmDialog } from '../../components/index.js'
 import { useToast } from '../../context/ToastContext.jsx'
 import { usePermission } from '../../hooks/usePermission.js'
 import JsBarcode from 'jsbarcode'
@@ -28,6 +29,9 @@ function Products() {
   const [printModalOpen, setPrintModalOpen] = useState(false)
   const [printProduct, setPrintProduct] = useState(null)
   const [printQty, setPrintQty] = useState(1)
+  const [csvConfirmOpen, setCsvConfirmOpen] = useState(false)
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
+  const [deleteTarget, setDeleteTarget] = useState(null)
 
   const openPrintBarcode = (product) => {
     setPrintProduct(product)
@@ -109,7 +113,6 @@ function Products() {
   }
 
   const handleDelete = async (id) => {
-    if (!confirm('Delete this product?')) return
     try { await productsApi.remove(id); addToast('Product deleted', 'success'); load() }
     catch (err) { addToast(err.message || 'Delete failed', 'error') }
   }
@@ -150,13 +153,13 @@ function Products() {
     <div>
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-2">
-          <input type="text" placeholder="Search products..." value={search}
+          <InputField name="search" placeholder="Search products..." value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full max-w-xs rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20" />
-          <button onClick={() => downloadCSV(['name', 'sku', 'price', 'cost', 'category', 'stock', 'barcode', 'minStock', 'maxStock', 'reorderPoint'], items, `products-${new Date().toISOString().slice(0, 10)}.csv`)} className="border border-gray-300 text-gray-600 px-4 py-2 rounded-lg text-sm hover:bg-gray-50 min-w-[120px]">Export CSV</button>
-          {canWrite && <button onClick={() => setBulkModalOpen(true)} className="border border-indigo-300 text-indigo-600 px-4 py-2 rounded-lg text-sm hover:bg-indigo-50">Bulk Price</button>}
+            className="max-w-xs mb-0" />
+          <Button variant="secondary" size="md" onClick={() => setCsvConfirmOpen(true)}>Export CSV</Button>
+          {canWrite && <Button variant="secondary" size="md" onClick={() => setBulkModalOpen(true)}>Bulk Price</Button>}
         </div>
-        {canWrite && <button onClick={openCreate} className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-indigo-500 transition-colors">+ Add Product</button>}
+        {canWrite && <Button variant="primary" onClick={openCreate}>+ Add Product</Button>}
       </div>
 
       {loading ? <Spinner /> : (
@@ -192,9 +195,9 @@ function Products() {
                     <td className={`px-4 py-3 text-right ${ss.color}`}>{ss.label}</td>
                     <td className="px-4 py-3 text-right text-gray-500">{item.reorderPoint || '-'}</td>
                     <td className="px-4 py-3 text-center">
-                      <button onClick={() => openPrintBarcode(item)} className="text-gray-500 hover:text-gray-700 mr-2" title="Print Barcode"><svg className="w-4 h-4 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6.72 14.84l-2.12 2.12a3 3 0 0 0 0 4.24 3 3 0 0 0 4.24 0l2.12-2.12m0-11.28l2.12-2.12a3 3 0 0 1 4.24 0 3 3 0 0 1 0 4.24l-2.12 2.12M14.84 6.72l-8.12 8.12" /></svg></button>
-                      {canWrite && <button onClick={() => openEdit(item)} className="text-indigo-600 hover:text-indigo-800 mr-3">Edit</button>}
-                      {canExecute && <button onClick={() => handleDelete(item._id || item.id)} className="text-red-600 hover:text-red-800">Delete</button>}
+                      <Button variant="ghost" size="sm" onClick={() => openPrintBarcode(item)} title="Print Barcode"><svg className="w-4 h-4 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6.72 14.84l-2.12 2.12a3 3 0 0 0 0 4.24 3 3 0 0 0 4.24 0l2.12-2.12m0-11.28l2.12-2.12a3 3 0 0 1 4.24 0 3 3 0 0 1 0 4.24l-2.12 2.12M14.84 6.72l-8.12 8.12" /></svg></Button>
+                      {canWrite && <Button variant="ghost" size="sm" onClick={() => openEdit(item)}>Edit</Button>}
+                      {canExecute && <Button variant="danger" size="sm" onClick={() => { setDeleteTarget(item._id || item.id); setDeleteConfirmOpen(true) }}>Delete</Button>}
                     </td>
                   </tr>
                 )
@@ -209,73 +212,37 @@ function Products() {
       <Modal isOpen={modalOpen} onClose={() => setModalOpen(false)} title={editing ? 'Edit Product' : 'Add Product'}>
         <form onSubmit={handleSave} className="space-y-3">
           <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
-              <input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">SKU</label>
-              <input required value={form.sku} onChange={(e) => setForm({ ...form, sku: e.target.value })} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20" />
-            </div>
+            <InputField label="Name" name="name" required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+            <InputField label="SKU" name="sku" required value={form.sku} onChange={(e) => setForm({ ...form, sku: e.target.value })} />
           </div>
           <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Price</label>
-              <input type="number" step="0.01" min="0" required value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Cost</label>
-              <input type="number" step="0.01" min="0" required value={form.cost} onChange={(e) => setForm({ ...form, cost: e.target.value })} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20" />
-            </div>
+            <InputField label="Price" name="price" type="number" step="0.01" min="0" required value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} />
+            <InputField label="Cost" name="cost" type="number" step="0.01" min="0" required value={form.cost} onChange={(e) => setForm({ ...form, cost: e.target.value })} />
           </div>
           <div className="grid grid-cols-3 gap-3">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Min Stock</label>
-              <input type="number" min="0" value={form.minStock} onChange={(e) => setForm({ ...form, minStock: e.target.value })} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Max Stock</label>
-              <input type="number" min="0" value={form.maxStock} onChange={(e) => setForm({ ...form, maxStock: e.target.value })} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Reorder Point</label>
-              <input type="number" min="0" value={form.reorderPoint} onChange={(e) => setForm({ ...form, reorderPoint: e.target.value })} placeholder="Alert when stock at" className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20" />
-            </div>
+            <InputField label="Min Stock" name="minStock" type="number" min="0" value={form.minStock} onChange={(e) => setForm({ ...form, minStock: e.target.value })} />
+            <InputField label="Max Stock" name="maxStock" type="number" min="0" value={form.maxStock} onChange={(e) => setForm({ ...form, maxStock: e.target.value })} />
+            <InputField label="Reorder Point" name="reorderPoint" type="number" min="0" value={form.reorderPoint} onChange={(e) => setForm({ ...form, reorderPoint: e.target.value })} placeholder="Alert when stock at" />
           </div>
           <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Unit Value</label>
-              <input type="number" step="any" min="0" placeholder="e.g. 250, 1, 500" value={form.unitValue} onChange={(e) => setForm({ ...form, unitValue: e.target.value })} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Unit</label>
-              <select value={form.unit} onChange={(e) => setForm({ ...form, unit: e.target.value })} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20">
-                <option value="">Select unit</option>
-                {units.map((u) => <option key={u} value={u}>{u}</option>)}
-              </select>
-            </div>
+            <InputField label="Unit Value" name="unitValue" type="number" step="any" min="0" placeholder="e.g. 250, 1, 500" value={form.unitValue} onChange={(e) => setForm({ ...form, unitValue: e.target.value })} />
+            <Select label="Unit" name="unit" value={form.unit} onChange={(e) => setForm({ ...form, unit: e.target.value })}>
+              <option value="">Select unit</option>
+              {units.map((u) => <option key={u} value={u}>{u}</option>)}
+            </Select>
           </div>
           <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
-              <select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20">
-                <option value="">Select category</option>
-                {categories.map((cat) => <option key={cat._id || cat.id} value={cat.name}>{cat.name}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Barcode</label>
-              <input value={form.barcode} onChange={(e) => setForm({ ...form, barcode: e.target.value })} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20" />
-            </div>
+            <Select label="Category" name="category" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}>
+              <option value="">Select category</option>
+              {categories.map((cat) => <option key={cat._id || cat.id} value={cat.name}>{cat.name}</option>)}
+            </Select>
+            <InputField label="Barcode" name="barcode" value={form.barcode} onChange={(e) => setForm({ ...form, barcode: e.target.value })} />
           </div>
           {form.barcode && <div className="flex justify-center bg-gray-50 rounded-lg p-3"><svg ref={barcodeSvg} /></div>}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Stock</label>
-            <input type="number" min="0" required value={form.stock} onChange={(e) => setForm({ ...form, stock: e.target.value })} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20" />
-          </div>
+          <InputField label="Stock" name="stock" type="number" min="0" required value={form.stock} onChange={(e) => setForm({ ...form, stock: e.target.value })} />
           <div className="flex justify-end gap-3 pt-2">
-            <button type="button" onClick={() => setModalOpen(false)} className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800">Cancel</button>
-            <button type="submit" className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-indigo-500 transition-colors">{editing ? 'Update' : 'Create'}</button>
+            <Button variant="ghost" onClick={() => setModalOpen(false)}>Cancel</Button>
+            <Button variant="primary" type="submit">{editing ? 'Update' : 'Create'}</Button>
           </div>
         </form>
       </Modal>
@@ -284,19 +251,38 @@ function Products() {
         <div className="space-y-4">
           <p className="text-sm text-gray-600">Apply to all {items.length} loaded products</p>
           <div className="flex gap-2">
-            <select value={bulkForm.type} onChange={(e) => setBulkForm({ ...bulkForm, type: e.target.value })} className="border rounded-lg px-3 py-2 text-sm">
+            <Select name="bulkType" value={bulkForm.type} onChange={(e) => setBulkForm({ ...bulkForm, type: e.target.value })}>
               <option value="percentage">Adjust by %</option>
               <option value="fixed">Set fixed price</option>
-            </select>
-            <input type="number" step="0.01" value={bulkForm.value} onChange={(e) => setBulkForm({ ...bulkForm, value: e.target.value })} placeholder={bulkForm.type === 'percentage' ? '+/- %' : 'New price'} className="flex-1 border rounded-lg px-3 py-2 text-sm" />
+            </Select>
+            <InputField name="bulkValue" type="number" step="0.01" value={bulkForm.value} onChange={(e) => setBulkForm({ ...bulkForm, value: e.target.value })} placeholder={bulkForm.type === 'percentage' ? '+/- %' : 'New price'} className="flex-1" />
           </div>
           {bulkForm.type === 'percentage' && <p className="text-xs text-gray-400">Use positive number to increase, negative to decrease</p>}
           <div className="flex justify-end gap-2">
-            <button onClick={() => setBulkModalOpen(false)} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg">Cancel</button>
-            <button onClick={handleBulkUpdate} className="px-4 py-2 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">Apply</button>
+            <Button variant="ghost" onClick={() => setBulkModalOpen(false)}>Cancel</Button>
+            <Button variant="primary" onClick={handleBulkUpdate}>Apply</Button>
           </div>
         </div>
       </Modal>
+
+      <ConfirmDialog
+        isOpen={csvConfirmOpen}
+        onClose={() => setCsvConfirmOpen(false)}
+        onConfirm={() => { downloadCSV(['name', 'sku', 'price', 'cost', 'category', 'stock', 'barcode', 'minStock', 'maxStock', 'reorderPoint'], items, `products-${new Date().toISOString().slice(0, 10)}.csv`); setCsvConfirmOpen(false) }}
+        title="Export Products CSV"
+        message="You are about to export all loaded products to a CSV file. This may contain a large amount of data."
+        confirmText="Export"
+      />
+
+      <ConfirmDialog
+        isOpen={deleteConfirmOpen}
+        onClose={() => { setDeleteConfirmOpen(false); setDeleteTarget(null) }}
+        onConfirm={() => { handleDelete(deleteTarget); setDeleteConfirmOpen(false); setDeleteTarget(null) }}
+        title="Delete Product"
+        message="Are you sure you want to delete this product? This action cannot be undone."
+        confirmText="Delete"
+        confirmVariant="danger"
+      />
 
       <Modal isOpen={printModalOpen} onClose={() => setPrintModalOpen(false)} title="Print Barcode Label">
         <div className="space-y-4 text-center">
@@ -309,11 +295,11 @@ function Products() {
           )}
           <div>
             <label className="block text-sm text-gray-600 mb-1">Number of copies</label>
-            <input type="number" min={1} max={100} value={printQty} onChange={(e) => setPrintQty(Number(e.target.value))} className="border rounded-lg px-3 py-2 text-sm w-24 text-center" />
+            <InputField name="printQty" type="number" min={1} max={100} value={printQty} onChange={(e) => setPrintQty(Number(e.target.value))} className="w-24 text-center" />
           </div>
           <div className="flex justify-end gap-2">
-            <button onClick={() => setPrintModalOpen(false)} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg">Cancel</button>
-            <button onClick={handlePrintBarcode} className="px-4 py-2 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">Print</button>
+            <Button variant="ghost" onClick={() => setPrintModalOpen(false)}>Cancel</Button>
+            <Button variant="primary" onClick={handlePrintBarcode}>Print</Button>
           </div>
         </div>
       </Modal>

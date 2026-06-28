@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { reportsApi } from '../../services/api.js'
 import Spinner from '../../components/Spinner.jsx'
+import { Button } from '../../components/index.js'
 import { useToast } from '../../context/ToastContext.jsx'
 
 const tabs = ['Total Sales', 'Best-Selling Products', 'Inventory Status', 'Transaction Summaries', 'Profit & Loss', 'Slow-Moving']
@@ -49,19 +50,19 @@ function Reports() {
       <div className="flex justify-between items-center mb-6">
         <div className="flex gap-1 bg-gray-100 rounded-lg p-1 w-fit flex-wrap">
           {tabs.map((tab, i) => (
-            <button key={tab} onClick={() => setActiveTab(i)}
-              className={`px-3 py-2 text-sm font-medium rounded-md transition-colors ${activeTab === i ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
+            <Button key={tab} variant="ghost" size="sm" onClick={() => setActiveTab(i)}
+              className={activeTab === i ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500'}>
               {tab}
-            </button>
+            </Button>
           ))}
         </div>
         {isPeriodic && (
           <div className="flex gap-1 bg-gray-100 rounded-lg p-0.5 w-fit">
             {periods.map((p) => (
-              <button key={p.key} onClick={() => setPeriod(p.key)}
-                className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${period === p.key ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
+              <Button key={p.key} variant="ghost" size="sm" onClick={() => setPeriod(p.key)}
+                className={`px-3 py-1.5 ${period === p.key ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500'}`}>
                 {p.label}
-              </button>
+              </Button>
             ))}
           </div>
         )}

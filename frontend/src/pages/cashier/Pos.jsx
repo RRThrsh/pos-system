@@ -1,17 +1,23 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { productsApi, salesApi, promoCodesApi, configApi, customersApi, heldOrdersApi } from '../../services/api.js'
+import { productsApi, salesApi, promoCodesApi, configApi, heldOrdersApi, categoriesApi } from '../../services/api.js'
+import Modal from '../../components/Modal.jsx'
 import { useToast } from '../../context/ToastContext.jsx'
+import { useAuth } from '../../context/AuthContext.jsx'
 import { getDefaultShortcuts } from '../../constants/shortcuts.js'
 
 function Pos() {
   const { addToast } = useToast()
+  const { logout } = useAuth()
   const barcodeRef = useRef(null)
+  const handleCheckoutRef = useRef()
+  const handleBarcodeRef = useRef()
   const [products, setProducts] = useState([])
   const [search, setSearch] = useState('')
   const [barcode, setBarcode] = useState('')
   const [results, setResults] = useState([])
   const [cart, setCart] = useState([])
   const [paymentMethod, setPaymentMethod] = useState('cash')
+  const [paymentDetails, setPaymentDetails] = useState({})
   const [amountPaid, setAmountPaid] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [discount, setDiscount] = useState('')
@@ -25,19 +31,42 @@ function Pos() {
   const [taxRate, setTaxRate] = useState(0)
   const taxRateLoaded = useRef(false)
 
-  const [customerSearch, setCustomerSearch] = useState('')
-  const [customerResults, setCustomerResults] = useState([])
-  const [selectedCustomer, setSelectedCustomer] = useState(null)
-  const [showCustomerDropdown, setShowCustomerDropdown] = useState(false)
-  const [buyerTin, setBuyerTin] = useState('')
-  const [orderNotes, setOrderNotes] = useState('')
+  const [currentTid, setCurrentTid] = useState('')
+
+  const generateTid = () => `#${Math.random().toString(36).slice(2, 12).toUpperCase()}`
 
   const [showQuickKeys, setShowQuickKeys] = useState(false)
   const [quickKeys, setQuickKeys] = useState([])
 
   const [heldOrders, setHeldOrders] = useState([])
   const [showHeldOrders, setShowHeldOrders] = useState(false)
+  const [voidConfirmOpen, setVoidConfirmOpen] = useState(false)
+  const [selectedVoidIndex, setSelectedVoidIndex] = useState(0)
+  const [confirmingItem, setConfirmingItem] = useState(null)
+  const [confirmFocusIndex, setConfirmFocusIndex] = useState(0)
+  const voidModalRef = useRef(null)
+  const [chargeConfirmOpen, setChargeConfirmOpen] = useState(false)
+  const [chargeFocusIndex, setChargeFocusIndex] = useState(0)
+  const chargeModalRef = useRef(null)
 
+  useEffect(() => {
+    if (voidConfirmOpen) {
+      setSelectedVoidIndex(0)
+      setConfirmingItem(null)
+      setConfirmFocusIndex(0)
+      setTimeout(() => voidModalRef.current?.focus(), 50)
+    }
+  }, [voidConfirmOpen])
+
+  useEffect(() => {
+    if (chargeConfirmOpen) {
+      setChargeFocusIndex(0)
+      setTimeout(() => chargeModalRef.current?.focus(), 50)
+    }
+  }, [chargeConfirmOpen])
+
+  const [categories, setCategories] = useState([])
+  const [selectedCategory, setSelectedCategory] = useState('')
   const [storeInfo, setStoreInfo] = useState({ storeName: 'POS System', storeAddress: '', tin: '', ptuNumber: '' })
   const [shortcuts, setShortcuts] = useState(getDefaultShortcuts)
 
@@ -67,18 +96,22 @@ function Pos() {
         ptuNumber: ptu?.value || '',
       })
     }).catch(() => {})
-    configApi.get('shortcuts').then((res) => {
+      configApi.get('shortcuts').then((res) => {
       if (res && res.value) {
         try { const parsed = JSON.parse(res.value); setShortcuts(parsed) } catch {}
       }
     }).catch(() => {})
+    categoriesApi.getAll().then((res) => setCategories(Array.isArray(res) ? res : [])).catch(() => {})
   }, [])
 
   useEffect(() => {
     if (!search.trim()) { setResults([]); return }
     const q = search.toLowerCase()
-    setResults(products.filter((p) => p.name.toLowerCase().includes(q) || p.sku?.toLowerCase().includes(q) || p.barcode?.toLowerCase().includes(q)))
-  }, [search, products])
+    setResults(products.filter((p) =>
+      (p.name.toLowerCase().includes(q) || p.sku?.toLowerCase().includes(q) || p.barcode?.toLowerCase().includes(q)) &&
+      (!selectedCategory || p.category === selectedCategory || p.categoryId === selectedCategory)
+    ))
+  }, [search, products, selectedCategory])
 
   const handleBarcode = useCallback(() => {
     if (!barcode.trim()) return
@@ -86,14 +119,16 @@ function Pos() {
     if (product) { addToCart(product); setBarcode(''); barcodeRef.current?.focus() }
     else { addToast('Product not found for barcode: ' + barcode, 'error'); setBarcode('') }
   }, [barcode, products])
+  handleBarcodeRef.current = handleBarcode
 
-  useEffect(() => { if (barcode.length >= 4) handleBarcode() }, [barcode])
+  useEffect(() => { if (barcode.length >= 4) handleBarcodeRef.current() }, [barcode])
 
   const addToCart = (product) => {
+    if (!cart.length && !currentTid) setCurrentTid(generateTid())
     setCart((prev) => {
       const existing = prev.find((c) => (c._id || c.id) === (product._id || product.id))
       if (existing) return prev.map((c) => (c._id || c.id) === (product._id || product.id) ? { ...c, quantity: Math.min(c.quantity + 1, product.stock || 99) } : c)
-      return [...prev, { ...product, quantity: 1, notes: '' }]
+      return [...prev, { ...product, quantity: 1 }]
     })
     setSearch(''); setResults([])
   }
@@ -107,14 +142,26 @@ function Pos() {
     }).filter((c) => c.quantity > 0))
   }
 
-  const removeFromCart = (id) => setCart((prev) => prev.filter((c) => (c._id || c.id) !== id))
+  const clearCart = () => {
+    if (!cart.length) return
+    setCart([])
+    addToast('Cart cleared', 'info')
+  }
 
-  const updateCartItemNote = (id, notes) => setCart((prev) => prev.map((c) => (c._id || c.id) === id ? { ...c, notes } : c))
+  const removeFromCart = (id) => {
+    setCart((prev) => {
+      const next = prev.filter((c) => (c._id || c.id) !== id)
+      if (!next.length) setVoidConfirmOpen(false)
+      return next
+    })
+  }
 
-  const updateCartItemPrice = (id, price) => {
-    const p = parseFloat(price)
-    if (isNaN(p) || p < 0) return
-    setCart((prev) => prev.map((c) => (c._id || c.id) === id ? { ...c, price: p } : c))
+  const confirmVoidItem = () => {
+    const c = confirmingItem
+    if (!c) return
+    removeFromCart(c._id || c.id)
+    setConfirmingItem(null)
+    addToast(`${c.name} removed from cart`, 'info')
   }
 
   const subtotal = cart.reduce((sum, c) => sum + c.price * c.quantity, 0)
@@ -135,22 +182,12 @@ function Pos() {
     finally { setPromoLoading(false) }
   }
 
-  useEffect(() => {
-    if (!customerSearch.trim()) { setCustomerResults([]); setShowCustomerDropdown(false); return }
-    const timer = setTimeout(() => {
-      customersApi.search(customerSearch).then((res) => { setCustomerResults(Array.isArray(res) ? res : []); setShowCustomerDropdown(true) }).catch(() => {})
-    }, 300)
-    return () => clearTimeout(timer)
-  }, [customerSearch])
-
-  const selectCustomer = (c) => { setSelectedCustomer(c); setCustomerSearch(c.name); setShowCustomerDropdown(false) }
-
   const handleHoldOrder = async () => {
     if (!cart.length) return
     try {
       await heldOrdersApi.create({ items: cart, subtotal })
       addToast('Order held', 'success')
-      setCart([]); setSelectedCustomer(null); setCustomerSearch('')
+      setCart([])
       heldOrdersApi.getAll().then((res) => setHeldOrders(Array.isArray(res) ? res : [])).catch(() => {})
     } catch (err) { addToast(err.message || 'Failed to hold order', 'error') }
   }
@@ -159,8 +196,7 @@ function Pos() {
     try {
       const res = await heldOrdersApi.getById(order._id || order.id)
       if (res && res.items) {
-        setCart(res.items.map((i) => ({ _id: i.productId, id: i.productId, productId: i.productId, name: i.productName, price: i.price, quantity: i.qty || i.quantity, notes: i.notes || '' })))
-        if (res.customerName) { setSelectedCustomer({ name: res.customerName, phone: res.customerPhone }); setCustomerSearch(res.customerName) }
+        setCart(res.items.map((i) => ({ _id: i.productId, id: i.productId, productId: i.productId, name: i.productName, price: i.price, quantity: i.qty || i.quantity })))
       }
       await heldOrdersApi.remove(order._id || order.id)
       setHeldOrders((prev) => prev.filter((o) => (o._id || o.id) !== (order._id || order.id)))
@@ -172,31 +208,36 @@ function Pos() {
     if (!cart.length) return
     setSubmitting(true)
     try {
+      const tid = currentTid || generateTid()
       const sale = await salesApi.create({
-        items: cart.map((c) => ({ productId: c._id || c.id, qty: c.quantity, notes: c.notes })),
-        transactionId: `TXN-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`,
+        items: cart.map((c) => ({ productId: c._id || c.id, qty: c.quantity })),
+        transactionId: tid,
         paymentMethod, amountPaid: parseFloat(amountPaid) || total,
+        paymentDetails: Object.keys(paymentDetails).length ? paymentDetails : undefined,
         discount: discValue, discountType, orderType: 'walk-in',
         promoCode: promoCode || undefined, tax: taxAmount || undefined, taxRate: taxRate || undefined,
-        customerId: selectedCustomer?._id || selectedCustomer?.id,
-        customerName: selectedCustomer?.name, customerPhone: selectedCustomer?.phone, buyerTin: buyerTin || undefined,
-        notes: orderNotes || undefined,
       })
-      if (selectedCustomer && (selectedCustomer._id || selectedCustomer.id)) {
-        customersApi.addLoyaltyPoints(selectedCustomer._id || selectedCustomer.id, Math.floor(total)).catch(() => {})
-      }
       addToast('Sale completed!', 'success')
       setLastSale({
         ...sale, items: cart, subtotal, discount: discAmount + promoDiscount, tax: taxAmount, taxRate, total,
-        paymentMethod, amountPaid: parseFloat(amountPaid) || total, change: change > 0 ? change : 0,
-        orderType: 'walk-in', customerName: selectedCustomer?.name, customerPhone: selectedCustomer?.phone,
-        buyerTin, promoCode: promoCode || undefined, notes: orderNotes, receiptNumber: sale.receiptNumber,
+        paymentMethod, paymentDetails: Object.keys(paymentDetails).length ? paymentDetails : undefined,
+        amountPaid: parseFloat(amountPaid) || total, change: change > 0 ? change : 0,
+        orderType: 'walk-in', transactionId: tid,
+        promoCode: promoCode || undefined, receiptNumber: sale.receiptNumber,
       })
-      setCart([]); setAmountPaid(''); setDiscount(''); setPromoCode(''); setPromoDiscount(0)
-      setSelectedCustomer(null); setCustomerSearch(''); setBuyerTin(''); setOrderNotes('')
+      setCart([]); setCurrentTid(''); setAmountPaid(''); setDiscount(''); setPromoCode(''); setPromoDiscount(0); setPaymentDetails({})
       setShowReceipt(true)
     } catch (err) { addToast(err.message || 'Checkout failed', 'error') }
     finally { setSubmitting(false) }
+  }
+  handleCheckoutRef.current = handleCheckout
+
+  const toggleFullscreen = () => {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen()
+    } else {
+      document.exitFullscreen()
+    }
   }
 
   const handlePrint = () => {
@@ -227,11 +268,9 @@ function Pos() {
         ${storeInfo.ptuNumber ? `<p class="sub">PTU: ${storeInfo.ptuNumber}</p>` : ''}
         <p class="sub">${new Date().toLocaleString('en-PH')}</p>
         ${s.receiptNumber ? `<p class="sub">OR #: ${s.receiptNumber}</p>` : ''}
-        ${s.customerName ? `<p class="sub">Customer: ${s.customerName}</p>` : ''}
-        ${s.buyerTin ? `<p class="sub">TIN: ${s.buyerTin}</p>` : ''}
+        ${s.transactionId ? `<p class="sub">Txn: ${s.transactionId}</p>` : ''}
         <div class="line"></div>
         <table>${itemsHtml}</table>
-        ${s.notes ? `<p class="small">${s.notes}</p>` : ''}
         <div class="line"></div>
         <table>
           <tr><td>Subtotal</td><td style="text-align:right">&#8369;${s.subtotal.toLocaleString()}</td></tr>
@@ -271,18 +310,21 @@ function Pos() {
 
   useEffect(() => {
     const handleKeyDown = (e) => {
+      if (e.repeat) return
       const s = shortcuts
-      if (e.key === s.charge?.key && cart.length) { e.preventDefault(); handleCheckout() }
+      if (e.key === s.charge?.key && cart.length) { e.preventDefault(); handleCheckoutRef.current() }
       if (e.key === s.scan?.key) { e.preventDefault(); barcodeRef.current?.focus() }
-      if (e.key === s.quickKeys?.key) { e.preventDefault(); setShowQuickKeys(!showQuickKeys) }
-      if (e.key === s.close?.key) { setShowReceipt(false); setShowHeldOrders(false) }
+      if (e.key === s.quickKeys?.key) { e.preventDefault(); setShowQuickKeys(prev => !prev) }
+      if (e.key === s.close?.key) { e.preventDefault(); setShowReceipt(false); setShowHeldOrders(false) }
+      if (e.key === s.fullscreen?.key) { e.preventDefault(); toggleFullscreen() }
+      if (e.key === s.logout?.key) { e.preventDefault(); logout() }
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [cart, showQuickKeys, shortcuts])
+  }, [cart.length, shortcuts])
 
   return (
-    <div className="flex gap-6 h-[calc(100vh-8rem)]">
+    <div className="flex p-8 gap-6 h-[calc(100vh-8rem)]">
       <div className="flex-1 flex flex-col">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-3">
@@ -295,41 +337,40 @@ function Pos() {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            {cart.length > 0 && (
-              <button onClick={handleHoldOrder} className="px-3 py-2 text-sm bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors">Hold Order</button>
-            )}
-            <div className="relative">
-              <button onClick={() => setShowHeldOrders(!showHeldOrders)} className="px-3 py-2 text-sm bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors">Held ({heldOrders.length})</button>
-              {showHeldOrders && (
-                <div className="absolute right-0 mt-2 w-72 bg-white rounded-lg shadow-lg border border-gray-200 z-50 max-h-80 overflow-auto">
-                  <div className="px-4 py-3 border-b border-gray-100 font-semibold text-sm text-gray-800">Held Orders</div>
-                  {heldOrders.length === 0 ? <p className="text-sm text-gray-500 text-center py-6">No held orders.</p> : heldOrders.map((o) => (
-                    <button key={o._id || o.id} onClick={() => recallOrder(o)} className="w-full text-left px-4 py-3 border-b border-gray-50 hover:bg-gray-50 transition-colors">
-                      <div className="text-sm font-medium text-gray-800">Walk-in</div>
-                      <div className="text-xs text-gray-500">{o.items?.length || 0} items &middot; &#8369;{Number(o.subtotal || 0).toLocaleString()}</div>
-                      <div className="text-xs text-gray-400">{new Date(o.createdAt).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</div>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
             <button onClick={() => setShowQuickKeys(!showQuickKeys)} className={`px-3 py-2 text-sm rounded-lg transition-colors ${showQuickKeys ? 'bg-indigo-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}>Quick Keys ({shortcuts.quickKeys?.key || 'F4'})</button>
+            <button onClick={logout} className="px-3 py-2 text-sm rounded-lg bg-gray-200 text-gray-700 hover:bg-red-100 hover:text-red-600 transition-colors" title={`Logout (${shortcuts.logout?.key || 'F12'})`}>
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0 0 13.5 3h-6a2.25 2.25 0 0 0-2.25 2.25v13.5A2.25 2.25 0 0 0 7.5 21h6a2.25 2.25 0 0 0 2.25-2.25V15m3 0 3-3m0 0-3-3m3 3H9" /></svg>
+            </button>
           </div>
         </div>
 
         {showQuickKeys && (
           <div className="mb-4">
             <div className="grid grid-cols-6 sm:grid-cols-8 md:grid-cols-10 lg:grid-cols-12 gap-2">
-              {quickKeys.map((p) => (
-                <button key={p._id || p.id} onClick={() => addToCart(p)} className="bg-white border border-gray-200 rounded-lg p-2 text-center hover:border-indigo-400 hover:shadow-sm transition-all">
+              {quickKeys.map((p) => {
+                const lowStock = p.stock <= 5
+                return (
+                <button key={p._id || p.id} onClick={() => addToCart(p)} className={`bg-white border rounded-lg p-2 text-center hover:shadow-sm transition-all ${lowStock ? 'border-red-200 hover:border-red-400' : 'border-gray-200 hover:border-indigo-400'}`}>
                   <div className="text-xs font-medium text-gray-800 truncate">{p.name}</div>
                   <div className="text-xs text-indigo-600 font-semibold">&#8369;{Number(p.price).toLocaleString()}</div>
+                  {lowStock && <div className="text-[10px] text-red-500 font-medium mt-0.5">{p.stock} left</div>}
                 </button>
-              ))}
+                )
+              })}
             </div>
           </div>
         )}
 
+        {categories.length > 0 && (
+          <div className="flex items-center gap-1.5 mb-3 overflow-x-auto pb-1">
+            <button onClick={() => setSelectedCategory('')}
+              className={`shrink-0 px-3 py-1.5 text-xs font-medium rounded-full transition-colors ${!selectedCategory ? 'bg-indigo-600 text-white' : 'bg-gray-200 text-gray-600 hover:bg-gray-300'}`}>All</button>
+            {categories.map((c) => (
+              <button key={c._id || c.id || c.name} onClick={() => setSelectedCategory(c.name || c._id || c.id)}
+                className={`shrink-0 px-3 py-1.5 text-xs font-medium rounded-full transition-colors ${selectedCategory === (c.name || c._id || c.id) ? 'bg-indigo-600 text-white' : 'bg-gray-200 text-gray-600 hover:bg-gray-300'}`}>{c.name}</button>
+            ))}
+          </div>
+        )}
         <div className="relative mb-4">
           <input type="text" placeholder="Search products by name, SKU, or barcode..." value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -338,12 +379,20 @@ function Pos() {
           <svg className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" /></svg>
           {results.length > 0 && (
             <div className="absolute z-10 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-auto">
-              {results.map((p) => (
+              {results.map((p) => {
+                const lowStock = p.stock <= 5
+                return (
                 <button key={p._id || p.id} type="button" onClick={() => addToCart(p)} className="w-full flex items-center justify-between px-4 py-2.5 text-sm hover:bg-indigo-50 text-left transition-colors">
-                  <div><span className="font-medium text-gray-900">{p.name}</span>{p.unitValue && p.unit && <span className="text-gray-400 ml-1">{p.unitValue}{p.unit}</span>}<span className="text-gray-400 ml-2">{p.sku}</span></div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium text-gray-900">{p.name}</span>
+                    {lowStock && <span className="text-xs bg-red-100 text-red-600 px-1.5 py-0.5 rounded font-medium">{p.stock} left</span>}
+                    {p.unitValue && p.unit && <span className="text-gray-400">{p.unitValue}{p.unit}</span>}
+                    <span className="text-gray-400">{p.sku}</span>
+                  </div>
                   <span className="text-indigo-600 font-semibold">&#8369;{Number(p.price).toLocaleString()}</span>
                 </button>
-              ))}
+                )
+              })}
             </div>
           )}
         </div>
@@ -359,31 +408,30 @@ function Pos() {
                   <th className="text-center px-4 py-3 font-medium">Price</th>
                   <th className="text-center px-4 py-3 font-medium">Qty</th>
                   <th className="text-right px-4 py-3 font-medium">Subtotal</th>
-                  <th className="text-center px-4 py-3 font-medium">Notes</th>
-                  <th className="text-center px-4 py-3 font-medium"></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {cart.map((c) => (
                   <tr key={c._id || c.id}>
                     <td className="px-4 py-3 font-medium text-gray-900">{c.name}</td>
-                    <td className="px-4 py-3 text-center">
-                      <input type="number" step="0.01" min="0" value={c.price} onChange={(e) => updateCartItemPrice(c._id || c.id, e.target.value)} className="w-24 text-center border border-gray-200 rounded px-2 py-1 text-sm" />
-                    </td>
+                    <td className="px-4 py-3 text-center font-medium">&#8369;{Number(c.price).toLocaleString()}</td>
                     <td className="px-4 py-3 text-center">
                       <div className="flex items-center justify-center gap-2">
                         <button onClick={() => updateQty(c._id || c.id, -1)} className="w-7 h-7 rounded-full border border-gray-300 text-gray-500 hover:bg-gray-100 transition-colors">-</button>
-                        <span className="w-6 text-center font-medium">{c.quantity}</span>
+                        <input type="number" min="1" value={c.quantity}
+                          onChange={(e) => {
+                            const v = parseInt(e.target.value, 10)
+                            if (!isNaN(v) && v > 0) {
+                              const product = products.find((p) => (p._id || p.id) === (c._id || c.id))
+                              const max = product?.stock || 99
+                              setCart((prev) => prev.map((ci) => (ci._id || ci.id) === (c._id || c.id) ? { ...ci, quantity: Math.min(v, max) } : ci))
+                            }
+                          }}
+                          className="w-12 text-center border border-gray-200 rounded px-1 py-1 text-sm" />
                         <button onClick={() => updateQty(c._id || c.id, 1)} className="w-7 h-7 rounded-full border border-gray-300 text-gray-500 hover:bg-gray-100 transition-colors">+</button>
                       </div>
                     </td>
                     <td className="px-4 py-3 text-right font-medium">&#8369;{(c.price * c.quantity).toLocaleString()}</td>
-                    <td className="px-4 py-3 text-center">
-                      <input value={c.notes || ''} onChange={(e) => updateCartItemNote(c._id || c.id, e.target.value)} placeholder="notes" className="w-20 text-xs border border-gray-200 rounded px-1 py-1" />
-                    </td>
-                    <td className="px-4 py-3 text-center">
-                      <button onClick={() => removeFromCart(c._id || c.id)} className="text-red-500 hover:text-red-700 transition-colors">&times;</button>
-                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -392,28 +440,14 @@ function Pos() {
         </div>
       </div>
 
-      <div className="w-80 flex flex-col">
+      <div className="w-96 flex flex-col">
         <div className="bg-white rounded-lg shadow p-5 flex flex-col h-full">
           <h2 className="text-lg font-semibold text-gray-800 mb-4">Order Summary</h2>
 
-          <div className="relative mb-3">
-            <label className="block text-sm font-medium text-gray-700 mb-1">Customer</label>
-            <input value={customerSearch} onChange={(e) => { setCustomerSearch(e.target.value); if (!e.target.value) setSelectedCustomer(null) }}
-              placeholder="Search customer..." className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none" />
-            {showCustomerDropdown && customerResults.length > 0 && (
-              <div className="absolute z-10 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-40 overflow-auto">
-                {customerResults.map((c) => (
-                  <button key={c._id || c.id} type="button" onClick={() => selectCustomer(c)} className="w-full text-left px-3 py-2 text-sm hover:bg-indigo-50">{c.name} {c.phone ? `(${c.phone})` : ''}</button>
-                ))}
-              </div>
-            )}
-            {selectedCustomer && <div className="flex items-center gap-1 mt-1 text-xs text-green-600 font-medium"><span>&#10003; {selectedCustomer.name}</span></div>}
-          </div>
-
-          {selectedCustomer && (
-            <div className="mb-3">
-              <label className="block text-sm font-medium text-gray-700 mb-1">Buyer TIN (for BIR)</label>
-              <input value={buyerTin} onChange={(e) => setBuyerTin(e.target.value)} placeholder="Optional" className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none" />
+          {currentTid && (
+            <div className="mb-3 px-3 py-2 bg-gray-50 rounded-lg text-center">
+              <span className="text-xs text-gray-500">Txn:</span>
+              <span className="text-sm font-mono font-semibold text-gray-800 ml-1">{currentTid}</span>
             </div>
           )}
 
@@ -443,10 +477,6 @@ function Pos() {
             </div>
           </div>
 
-          <div className="mb-3">
-            <label className="block text-sm font-medium text-gray-700 mb-1">Order Notes</label>
-            <textarea value={orderNotes} onChange={(e) => setOrderNotes(e.target.value)} placeholder="Notes for this transaction..." rows={2} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none" />
-          </div>
 
           <div className="flex-1">
             <div className="text-sm text-gray-500 space-y-1 mb-4">
@@ -461,16 +491,87 @@ function Pos() {
             </div>
 
             <div className="mb-3">
-              <label className="block text-sm font-medium text-gray-700 mb-1">Payment Method</label>
-              <select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none">
-                <option value="cash">Cash</option><option value="card">Card</option><option value="gcash">GCash</option><option value="maya">Maya</option>
-              </select>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Payment Method</label>
+              <div className="grid grid-cols-4 gap-2">
+                {[
+                  { value: 'cash', label: 'Cash', icon: <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M12 6v12m-3-2.818.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg> },
+                  { value: 'card', label: 'Card', icon: <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 0 0 2.25-2.25V6.75A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25v10.5A2.25 2.25 0 0 0 4.5 19.5Z" /></svg> },
+                  { value: 'gcash', label: 'GCash', icon: <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M10.5 1.5H8.25A2.25 2.25 0 0 0 6 3.75v16.5a2.25 2.25 0 0 0 2.25 2.25h7.5A2.25 2.25 0 0 0 18 20.25V3.75a2.25 2.25 0 0 0-2.25-2.25H13.5m-3 0V3h3V1.5m-3 0h3m-3 18.75h3" /></svg> },
+                  { value: 'maya', label: 'Maya', icon: <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M21 12a2.25 2.25 0 0 0-2.25-2.25H15a3 3 0 1 1-6 0H5.25A2.25 2.25 0 0 0 3 12m18 0v6a2.25 2.25 0 0 1-2.25 2.25H5.25A2.25 2.25 0 0 1 3 18v-6m18 0V9M3 12V9m18 0a2.25 2.25 0 0 0-2.25-2.25H5.25A2.25 2.25 0 0 0 3 9m18 0V6a2.25 2.25 0 0 0-2.25-2.25H5.25A2.25 2.25 0 0 0 3 6v3" /></svg> },
+                ].map(({ value, label, icon }) => (
+                  <button key={value}
+                    onClick={() => setPaymentMethod(value)}
+                    className={`flex flex-col items-center gap-1.5 py-3 px-2 rounded-xl text-xs font-medium transition-all border-2 ${paymentMethod === value ? 'border-indigo-500 bg-indigo-50 text-indigo-700 shadow-sm' : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300 hover:bg-gray-50'}`}
+                  >
+                    {icon}
+                    <span>{label}</span>
+                  </button>
+                ))}
+              </div>
             </div>
 
             {paymentMethod === 'cash' && (
               <div className="mb-3">
                 <label className="block text-sm font-medium text-gray-700 mb-1">Amount Paid</label>
-                <input type="number" step="0.01" min="0" value={amountPaid} onChange={(e) => setAmountPaid(e.target.value)} placeholder="0.00" className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none" />
+                <input type="text" inputMode="decimal" value={amountPaid}
+                  onChange={(e) => {
+                    const v = e.target.value.replace(/[^0-9.]/g, '').replace(/(\..*)\./g, '$1')
+                    if (parseFloat(v) > 999999.99) return
+                    setAmountPaid(v)
+                  }}
+                  placeholder="0.00" className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none" />
+              </div>
+            )}
+
+            {paymentMethod === 'card' && (
+              <div className="mb-3 space-y-2">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Card Type</label>
+                  <select value={paymentDetails.cardType || ''} onChange={(e) => setPaymentDetails((p) => ({ ...p, cardType: e.target.value }))} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none">
+                    <option value="">Select card type</option>
+                    <option value="visa">Visa</option>
+                    <option value="mastercard">Mastercard</option>
+                    <option value="amex">American Express</option>
+                    <option value="jcb">JCB</option>
+                    <option value="other">Other</option>
+                  </select>
+                </div>
+                <div className="flex gap-2">
+                  <div className="flex-1">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Last 4 Digits</label>
+                    <input type="text" maxLength={4} value={paymentDetails.cardLast4 || ''} onChange={(e) => setPaymentDetails((p) => ({ ...p, cardLast4: e.target.value.replace(/\D/g, '').slice(0, 4) }))} placeholder="1234" className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none" />
+                  </div>
+                  <div className="flex-1">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Reference #</label>
+                    <input type="text" value={paymentDetails.cardRef || ''} onChange={(e) => setPaymentDetails((p) => ({ ...p, cardRef: e.target.value }))} placeholder="Auth code" className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none" />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {paymentMethod === 'gcash' && (
+              <div className="mb-3 space-y-2">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Reference Number</label>
+                  <input type="text" value={paymentDetails.gcashRef || ''} onChange={(e) => setPaymentDetails((p) => ({ ...p, gcashRef: e.target.value }))} placeholder="GCash reference #" className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Sender Name (optional)</label>
+                  <input type="text" value={paymentDetails.gcashSender || ''} onChange={(e) => setPaymentDetails((p) => ({ ...p, gcashSender: e.target.value }))} placeholder="Sender's full name" className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none" />
+                </div>
+              </div>
+            )}
+
+            {paymentMethod === 'maya' && (
+              <div className="mb-3 space-y-2">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Reference Number</label>
+                  <input type="text" value={paymentDetails.mayaRef || ''} onChange={(e) => setPaymentDetails((p) => ({ ...p, mayaRef: e.target.value }))} placeholder="Maya reference #" className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Account Name (optional)</label>
+                  <input type="text" value={paymentDetails.mayaAccount || ''} onChange={(e) => setPaymentDetails((p) => ({ ...p, mayaAccount: e.target.value }))} placeholder="Account holder name" className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none" />
+                </div>
               </div>
             )}
 
@@ -482,12 +583,136 @@ function Pos() {
             )}
           </div>
 
-          <button onClick={handleCheckout}
-            disabled={!cart.length || submitting || (paymentMethod === 'cash' && amountPaid && parseFloat(amountPaid) < total)}
-            className="w-full bg-green-600 text-white py-3 rounded-lg text-sm font-bold shadow-sm hover:bg-green-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >{submitting ? 'Processing...' : `Charge  \u20B1${total.toLocaleString()} (${shortcuts.charge?.key || 'F2'})`}</button>
+          <div className="flex gap-2 mb-2">
+            <button onClick={handleHoldOrder} disabled={!cart.length} className="flex-1 px-3 py-2 text-sm bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">Hold Order</button>
+            <div className="relative flex-1">
+              <button onClick={() => setShowHeldOrders(!showHeldOrders)} className="w-full px-3 py-2 text-sm bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors">Held ({heldOrders.length})</button>
+              {showHeldOrders && (
+                <div className="absolute right-0 mt-2 w-72 bg-white rounded-lg shadow-lg border border-gray-200 z-50 max-h-80 overflow-auto">
+                  <div className="px-4 py-3 border-b border-gray-100 font-semibold text-sm text-gray-800">Held Orders</div>
+                  {heldOrders.length === 0 ? <p className="text-sm text-gray-500 text-center py-6">No held orders.</p> : heldOrders.map((o) => (
+                    <button key={o._id || o.id} onClick={() => recallOrder(o)} className="w-full text-left px-4 py-3 border-b border-gray-50 hover:bg-gray-50 transition-colors">
+                      <div className="text-sm font-medium text-gray-800">Walk-in</div>
+                      <div className="text-xs text-gray-500">{o.items?.length || 0} items &middot; &#8369;{Number(o.subtotal || 0).toLocaleString()}</div>
+                      <div className="text-xs text-gray-400">{new Date(o.createdAt).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <button onClick={() => setVoidConfirmOpen(true)}
+              disabled={!cart.length}
+              className="flex-1 bg-red-500 text-white py-3 rounded-lg text-sm font-bold shadow-sm hover:bg-red-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >Void</button>
+            <button onClick={() => setChargeConfirmOpen(true)}
+              disabled={!cart.length || submitting || (paymentMethod === 'cash' && (!amountPaid || parseFloat(amountPaid) < total))}
+              className="flex-1 bg-green-600 text-white py-3 rounded-lg text-sm font-bold shadow-sm hover:bg-green-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >{submitting ? 'Processing...' : `Charge  \u20B1${total.toLocaleString()} (${shortcuts.charge?.key || 'F2'})`}</button>
+          </div>
         </div>
       </div>
+
+      <Modal isOpen={voidConfirmOpen} onClose={() => setVoidConfirmOpen(false)} title="Void Item">
+        <div className="space-y-3" tabIndex={0} ref={voidModalRef}
+          onKeyDown={(e) => {
+            if (confirmingItem) {
+              if (e.key === 'Escape') { e.preventDefault(); setVoidConfirmOpen(false); return }
+              if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') { e.preventDefault(); setConfirmFocusIndex((prev) => prev === 0 ? 1 : 0); return }
+              if (e.key === 'Enter') { e.preventDefault(); if (confirmFocusIndex === 0) { setConfirmingItem(null); setTimeout(() => voidModalRef.current?.focus(), 50) } else { confirmVoidItem() }; return }
+              return
+            }
+            if (e.key === 'Escape') { e.preventDefault(); setVoidConfirmOpen(false); return }
+            if (e.key === 'ArrowDown') { e.preventDefault(); setSelectedVoidIndex((prev) => Math.min(prev + 1, cart.length - 1)) }
+            if (e.key === 'ArrowUp') { e.preventDefault(); setSelectedVoidIndex((prev) => Math.max(prev - 1, 0)) }
+            if (e.key === 'Enter') { e.preventDefault(); const c = cart[selectedVoidIndex]; if (c) { setConfirmingItem(c); setConfirmFocusIndex(1) } }
+          }}
+        >
+          {confirmingItem ? (
+            <div className="space-y-5">
+              <div className="flex items-center gap-3 p-4 bg-red-50 rounded-lg border border-red-200">
+                <div className="flex-shrink-0 flex items-center justify-center w-10 h-10 rounded-full bg-red-100">
+                  <svg className="w-5 h-5 text-red-600" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" /></svg>
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-red-800">Void this item?</p>
+                  <p className="text-sm text-red-700"><strong>{confirmingItem.name}</strong> x{confirmingItem.quantity} &mdash; &#8369;{(confirmingItem.price * confirmingItem.quantity).toLocaleString()}</p>
+                </div>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-gray-400"><kbd className="px-1.5 py-0.5 bg-gray-100 border border-gray-300 rounded text-[10px] font-mono">&#8592;</kbd> <kbd className="px-1.5 py-0.5 bg-gray-100 border border-gray-300 rounded text-[10px] font-mono">&#8594;</kbd> navigate &middot; <kbd className="px-1.5 py-0.5 bg-gray-100 border border-gray-300 rounded text-[10px] font-mono">Enter</kbd> select &middot; <kbd className="px-1.5 py-0.5 bg-gray-100 border border-gray-300 rounded text-[10px] font-mono">Esc</kbd> exit</span>
+              </div>
+              <div className="flex justify-end gap-3">
+                <button onClick={() => { setConfirmingItem(null); setTimeout(() => voidModalRef.current?.focus(), 50) }} className={`px-5 py-2 text-sm font-medium rounded-lg transition-all ${confirmFocusIndex === 0 ? 'ring-2 ring-offset-1 ring-gray-400 bg-gray-200 text-gray-800' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>Cancel</button>
+                <button onClick={() => { confirmVoidItem() }} className={`px-5 py-2 text-sm font-medium rounded-lg transition-all ${confirmFocusIndex === 1 ? 'ring-2 ring-offset-1 ring-red-400 bg-red-600 text-white' : 'bg-red-500 text-white hover:bg-red-600'}`}>Yes, void it</button>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <p className="text-sm text-gray-500">Select an item to void</p>
+                <span className="text-[10px] text-gray-400"><kbd className="px-1.5 py-0.5 bg-gray-100 border border-gray-300 rounded text-[10px] font-mono">&#8593;</kbd> <kbd className="px-1.5 py-0.5 bg-gray-100 border border-gray-300 rounded text-[10px] font-mono">&#8595;</kbd> navigate &middot; <kbd className="px-1.5 py-0.5 bg-gray-100 border border-gray-300 rounded text-[10px] font-mono">Enter</kbd> select &middot; <kbd className="px-1.5 py-0.5 bg-gray-100 border border-gray-300 rounded text-[10px] font-mono">Esc</kbd> exit</span>
+              </div>
+              <div className="max-h-64 overflow-auto rounded-lg border border-gray-200 divide-y divide-gray-100">
+                {cart.map((c, i) => (
+                  <div key={i}
+                    onDoubleClick={() => setConfirmingItem(c)}
+                    className={`flex items-center justify-between px-4 py-3 text-sm cursor-pointer transition-all ${selectedVoidIndex === i ? 'bg-red-50 border-l-4 border-red-500 -ml-px' : 'hover:bg-gray-50 border-l-4 border-transparent'}`}>
+                    <div className="flex items-center gap-3 min-w-0">
+                      <span className={`flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-bold ${selectedVoidIndex === i ? 'bg-red-500 text-white' : 'bg-gray-200 text-gray-500'}`}>{i + 1}</span>
+                      <span className="truncate font-medium text-gray-800">{c.name}</span>
+                    </div>
+                    <div className="flex items-center gap-4 flex-shrink-0">
+                      <span className="text-gray-400">x{c.quantity}</span>
+                      <span className="font-semibold text-gray-900 w-20 text-right">&#8369;{(c.price * c.quantity).toLocaleString()}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="flex justify-end">
+                <button onClick={() => setVoidConfirmOpen(false)} className="px-4 py-2 text-sm font-medium bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 transition-colors">Close</button>
+              </div>
+            </div>
+          )}
+        </div>
+      </Modal>
+
+      <Modal isOpen={chargeConfirmOpen} onClose={() => setChargeConfirmOpen(false)} title="Confirm Charge">
+        <div className="space-y-4" tabIndex={0} ref={chargeModalRef}
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') { e.preventDefault(); setChargeConfirmOpen(false); return }
+            if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') { e.preventDefault(); setChargeFocusIndex((prev) => prev === 0 ? 1 : 0); return }
+            if (e.key === 'Enter') { e.preventDefault(); if (chargeFocusIndex === 1) { setChargeConfirmOpen(false); handleCheckout() } else { setChargeConfirmOpen(false) }; return }
+          }}
+        >
+          <div className="max-h-48 overflow-auto rounded-lg border border-gray-200 divide-y divide-gray-100">
+            {cart.map((c, i) => (
+              <div key={i} className="flex items-center justify-between px-4 py-2.5 text-sm">
+                <span className="truncate text-gray-800">{c.name} <span className="text-gray-400">x{c.quantity}</span></span>
+                <span className="font-medium text-gray-900">&#8369;{(c.price * c.quantity).toLocaleString()}</span>
+              </div>
+            ))}
+          </div>
+          <div className="space-y-1.5 text-sm">
+            <div className="flex justify-between text-gray-600"><span>Subtotal</span><span>&#8369;{subtotal.toLocaleString()}</span></div>
+            {(discAmount > 0 || promoDiscount > 0) && <div className="flex justify-between text-green-600"><span>Discount</span><span>-&#8369;{(discAmount + promoDiscount).toLocaleString()}</span></div>}
+            {taxAmount > 0 && <div className="flex justify-between text-gray-600"><span>Tax ({(taxRate).toFixed(1)}%)</span><span>&#8369;{taxAmount.toLocaleString()}</span></div>}
+            <div className="flex justify-between font-bold text-base border-t border-gray-200 pt-1.5"><span>Total</span><span>&#8369;{total.toLocaleString()}</span></div>
+            {paymentMethod === 'cash' && amountPaid && (
+              <div className="flex justify-between text-gray-600"><span>Amount Paid</span><span>&#8369;{parseFloat(amountPaid).toLocaleString()}</span></div>
+            )}
+            {change > 0 && <div className="flex justify-between text-gray-600"><span>Change</span><span>&#8369;{change.toLocaleString()}</span></div>}
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-gray-400"><kbd className="px-1.5 py-0.5 bg-gray-100 border border-gray-300 rounded text-[10px] font-mono">&#8592;</kbd> <kbd className="px-1.5 py-0.5 bg-gray-100 border border-gray-300 rounded text-[10px] font-mono">&#8594;</kbd> navigate &middot; <kbd className="px-1.5 py-0.5 bg-gray-100 border border-gray-300 rounded text-[10px] font-mono">Enter</kbd> confirm &middot; <kbd className="px-1.5 py-0.5 bg-gray-100 border border-gray-300 rounded text-[10px] font-mono">Esc</kbd> cancel</span>
+          </div>
+          <div className="flex justify-end gap-3">
+            <button onClick={() => setChargeConfirmOpen(false)} className={`px-5 py-2 text-sm font-medium rounded-lg transition-all ${chargeFocusIndex === 0 ? 'ring-2 ring-offset-1 ring-gray-400 bg-gray-200 text-gray-800' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>Cancel</button>
+            <button onClick={() => { setChargeConfirmOpen(false); handleCheckout() }} className={`px-5 py-2 text-sm font-medium rounded-lg transition-all ${chargeFocusIndex === 1 ? 'ring-2 ring-offset-1 ring-green-400 bg-green-600 text-white' : 'bg-green-500 text-white hover:bg-green-600'}`}>Confirm Charge</button>
+          </div>
+        </div>
+      </Modal>
 
       {showReceipt && lastSale && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setShowReceipt(false)}>
@@ -502,7 +727,7 @@ function Pos() {
 
             <div className="bg-gray-50 rounded-lg p-4 text-sm space-y-2 font-mono">
               <p className="text-center text-gray-500">{new Date().toLocaleString('en-PH')}</p>
-              {lastSale.customerName && <p className="text-center text-gray-600">{lastSale.customerName}</p>}
+              {lastSale.transactionId && <p className="text-center text-gray-600 text-xs">Txn: {lastSale.transactionId}</p>}
               <div className="border-t border-dashed border-gray-300 my-2" />
               {lastSale.items.map((item, i) => (
                 <div key={i} className="flex justify-between">

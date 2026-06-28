@@ -1,4 +1,7 @@
 export { default as Button } from './Button.jsx'
 export { default as InputField } from './InputField.jsx'
+export { default as Select } from './Select.jsx'
+export { default as Textarea } from './Textarea.jsx'
 export { default as Spinner } from './Spinner.jsx'
 export { default as Modal } from './Modal.jsx'
+export { default as ConfirmDialog } from './ConfirmDialog.jsx'

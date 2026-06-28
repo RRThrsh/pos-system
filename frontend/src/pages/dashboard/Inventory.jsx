@@ -3,6 +3,7 @@ import { inventoryApi, productsApi, downloadCSV } from '../../services/api.js'
 import Modal from '../../components/Modal.jsx'
 import Spinner from '../../components/Spinner.jsx'
 import Pagination, { PAGE_SIZE } from '../../components/Pagination.jsx'
+import { Button, InputField, Select, ConfirmDialog } from '../../components/index.js'
 import { useToast } from '../../context/ToastContext.jsx'
 import { usePermission } from '../../hooks/usePermission.js'
 
@@ -13,6 +14,8 @@ function Inventory() {
   const [products, setProducts] = useState([])
   const [loading, setLoading] = useState(true)
   const [modalOpen, setModalOpen] = useState(false)
+  const [csvConfirmOpen, setCsvConfirmOpen] = useState(false)
+  const [csvTab, setCsvTab] = useState('stock')
   const [form, setForm] = useState({ productId: '', quantity: '', type: 'in', reason: '' })
   const [stockPage, setStockPage] = useState(1)
   const [movPage, setMovPage] = useState(1)
@@ -76,28 +79,32 @@ function Inventory() {
     <div>
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-2">
-          <input type="text" placeholder="Search products..." value={search}
+          <InputField name="search" placeholder="Search products..." value={search}
             onChange={(e) => { setSearch(e.target.value); setStockPage(1) }}
-            className="w-full max-w-xs rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20" />
-          {tab === 'stock' && <button onClick={() => downloadCSV(['name', 'sku', 'stock', 'category'], filteredStock, `inventory-stock-${new Date().toISOString().slice(0, 10)}.csv`)} className="border border-gray-300 text-gray-600 px-4 py-2 rounded-lg text-sm hover:bg-gray-50 min-w-[120px]">Export CSV</button>}
-          {tab === 'movements' && <button onClick={() => downloadCSV(['productName', 'type', 'quantity', 'reason', 'date'], sortedMovements, `inventory-movements-${new Date().toISOString().slice(0, 10)}.csv`)} className="border border-gray-300 text-gray-600 px-4 py-2 rounded-lg text-sm hover:bg-gray-50 min-w-[120px]">Export CSV</button>}
+            className="max-w-xs mb-0" />
+          {tab === 'stock' && <Button variant="secondary" size="md" onClick={() => { setCsvTab('stock'); setCsvConfirmOpen(true) }}>Export CSV</Button>}
+          {tab === 'movements' && <Button variant="secondary" size="md" onClick={() => { setCsvTab('movements'); setCsvConfirmOpen(true) }}>Export CSV</Button>}
         </div>
-        {canWrite && <button onClick={() => setModalOpen(true)} className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-indigo-500 transition-colors">+ Adjust Stock</button>}
+        {canWrite && <Button variant="primary" onClick={() => setModalOpen(true)}>+ Adjust Stock</Button>}
       </div>
 
       <div className="flex gap-1 mb-6 bg-gray-100 rounded-lg p-1 w-fit">
-        <button
+        <Button
+          variant="ghost"
+          size="sm"
           onClick={() => setTab('stock')}
-          className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${tab === 'stock' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+          className={tab === 'stock' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500'}
         >
           Stock Levels
-        </button>
-        <button
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
           onClick={() => setTab('movements')}
-          className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${tab === 'movements' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+          className={tab === 'movements' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500'}
         >
           Movement History
-        </button>
+        </Button>
       </div>
 
       {loading ? <Spinner /> : (
@@ -182,37 +189,41 @@ function Inventory() {
         </>
       )}
 
+      <ConfirmDialog
+        isOpen={csvConfirmOpen}
+        onClose={() => setCsvConfirmOpen(false)}
+        onConfirm={() => {
+          if (csvTab === 'stock') {
+            downloadCSV(['name', 'sku', 'stock', 'category'], filteredStock, `inventory-stock-${new Date().toISOString().slice(0, 10)}.csv`)
+          } else {
+            downloadCSV(['productName', 'type', 'quantity', 'reason', 'date'], sortedMovements, `inventory-movements-${new Date().toISOString().slice(0, 10)}.csv`)
+          }
+          setCsvConfirmOpen(false)
+        }}
+        title="Export Inventory CSV"
+        message="You are about to export inventory data to a CSV file. This may contain a large amount of data."
+        confirmText="Export"
+      />
+
       <Modal isOpen={modalOpen} onClose={() => setModalOpen(false)} title="Adjust Stock">
         <form onSubmit={handleAdjust} className="space-y-3">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Product</label>
-            <select required value={form.productId} onChange={(e) => setForm({ ...form, productId: e.target.value })} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20">
-              <option value="">Select product</option>
-              {[...products].sort((a, b) => (a.stock || 0) - (b.stock || 0)).map((p) => (
-                <option key={p._id || p.id} value={p._id || p.id}>{p.name} (Stock: {p.stock})</option>
-              ))}
-            </select>
-          </div>
+          <Select label="Product" name="productId" required value={form.productId} onChange={(e) => setForm({ ...form, productId: e.target.value })}>
+            <option value="">Select product</option>
+            {[...products].sort((a, b) => (a.stock || 0) - (b.stock || 0)).map((p) => (
+              <option key={p._id || p.id} value={p._id || p.id}>{p.name} (Stock: {p.stock})</option>
+            ))}
+          </Select>
           <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Type</label>
-              <select value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20">
-                <option value="in">Stock In</option>
-                <option value="out">Stock Out</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Quantity</label>
-              <input type="number" min="1" required value={form.quantity} onChange={(e) => setForm({ ...form, quantity: e.target.value })} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20" />
-            </div>
+            <Select label="Type" name="type" value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })}>
+              <option value="in">Stock In</option>
+              <option value="out">Stock Out</option>
+            </Select>
+            <InputField label="Quantity" name="quantity" type="number" min="1" required value={form.quantity} onChange={(e) => setForm({ ...form, quantity: e.target.value })} />
           </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Reason</label>
-            <input value={form.reason} onChange={(e) => setForm({ ...form, reason: e.target.value })} placeholder="e.g. Delivery, spoilage, count adjustment" className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20" />
-          </div>
+          <InputField label="Reason" name="reason" value={form.reason} onChange={(e) => setForm({ ...form, reason: e.target.value })} placeholder="e.g. Delivery, spoilage, count adjustment" />
           <div className="flex justify-end gap-3 pt-2">
-            <button type="button" onClick={() => setModalOpen(false)} className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800">Cancel</button>
-            <button type="submit" className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-indigo-500 transition-colors">Save Adjustment</button>
+            <Button variant="ghost" onClick={() => setModalOpen(false)}>Cancel</Button>
+            <Button variant="primary" type="submit">Save Adjustment</Button>
           </div>
         </form>
       </Modal>

@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom'
 import { productsApi, salesApi, reportsApi } from '../../services/api.js'
 import { downloadCSV } from '../../services/api.js'
 import Spinner from '../../components/Spinner.jsx'
+import { ConfirmDialog } from '../../components/index.js'
 import { useToast } from '../../context/ToastContext.jsx'
 
 function Snapshots() {
@@ -11,6 +12,7 @@ function Snapshots() {
   const { addToast } = useToast()
   const [loading, setLoading] = useState(true)
   const [data, setData] = useState(null)
+  const [csvConfirmOpen, setCsvConfirmOpen] = useState(false)
 
   useEffect(() => {
     if (!type) { setLoading(false); return }
@@ -83,6 +85,15 @@ function Snapshots() {
 
   return (
     <div>
+      <ConfirmDialog
+        isOpen={csvConfirmOpen}
+        onClose={() => setCsvConfirmOpen(false)}
+        onConfirm={() => { downloadCSV(Object.keys(data.rows[0]), data.rows, `${type}-snapshot-${new Date().toISOString().slice(0, 10)}.csv`); setCsvConfirmOpen(false) }}
+        title="Export Snapshot CSV"
+        message="You are about to export this snapshot data to a CSV file."
+        confirmText="Export"
+      />
+
       <div className="bg-white rounded-lg shadow p-6">
         <div className="flex justify-between items-center mb-6">
           <div>
@@ -90,7 +101,7 @@ function Snapshots() {
             <p className="text-sm text-gray-500">Captured: {data?.capturedAt ? new Date(data.capturedAt).toLocaleString() : ''}</p>
           </div>
           {data?.rows?.length > 0 && (
-            <button onClick={() => downloadCSV(Object.keys(data.rows[0]), data.rows, `${type}-snapshot-${new Date().toISOString().slice(0, 10)}.csv`)} className="bg-gray-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-gray-700 min-w-[120px]">
+            <button onClick={() => setCsvConfirmOpen(true)} className="bg-gray-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-gray-700 min-w-[120px]">
               Export CSV
             </button>
           )}

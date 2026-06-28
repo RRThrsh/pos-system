@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { customersApi } from '../../services/api.js'
 import Spinner from '../../components/Spinner.jsx'
+import { Button, InputField, Textarea, ConfirmDialog } from '../../components/index.js'
 import { useToast } from '../../context/ToastContext.jsx'
 
 function Customers() {
@@ -9,6 +10,8 @@ function Customers() {
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
+  const [deleteTarget, setDeleteTarget] = useState(null)
   const [editing, setEditing] = useState(null)
   const [form, setForm] = useState({ name: '', phone: '', email: '', address: '' })
 
@@ -51,7 +54,6 @@ function Customers() {
   }
 
   const handleDelete = async (id) => {
-    if (!confirm('Delete this customer?')) return
     try {
       await customersApi.remove(id)
       setCustomers(customers.filter(c => c._id !== id))
@@ -63,14 +65,12 @@ function Customers() {
 
   return (
     <div>
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Customers</h1>
-        <input type="text" placeholder="Search customers..." value={search} onChange={e => setSearch(e.target.value)}
-          className="max-w-xs w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-        <button onClick={() => { setEditing(null); setForm({ name: '', phone: '', email: '', address: '' }); setShowModal(true) }}
-          className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700">
+      <div className="flex items-center gap-2 mb-6 justify-between">
+        <InputField name="search" placeholder="Search customers..." value={search} onChange={e => setSearch(e.target.value)}
+          className="max-w-xs mb-0" />
+        <Button variant="primary" onClick={() => { setEditing(null); setForm({ name: '', phone: '', email: '', address: '' }); setShowModal(true) }}>
           + Add Customer
-        </button>
+        </Button>
       </div>
 
       {loading ? <Spinner /> : (
@@ -90,8 +90,8 @@ function Customers() {
                     <td className="px-4 py-3 text-center">{c.loyaltyPoints || 0}</td>
                     <td className="px-4 py-3 text-center">
                       <div className="flex justify-center gap-2">
-                        <button onClick={() => handleEdit(c)} className="text-indigo-600 hover:text-indigo-800 text-xs font-medium">Edit</button>
-                        <button onClick={() => handleDelete(c._id)} className="text-red-600 hover:text-red-800 text-xs font-medium">Delete</button>
+                        <Button variant="ghost" size="sm" onClick={() => handleEdit(c)}>Edit</Button>
+                        <Button variant="danger" size="sm" onClick={() => { setDeleteTarget(c._id); setDeleteConfirmOpen(true) }}>Delete</Button>
                       </div>
                     </td>
                   </tr>
@@ -106,18 +106,28 @@ function Customers() {
           <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-md mx-4" onClick={e => e.stopPropagation()}>
             <h2 className="text-lg font-bold text-gray-900 mb-4">{editing ? 'Edit Customer' : 'Add Customer'}</h2>
             <div className="space-y-4">
-              <div><label className="block text-sm font-medium text-gray-700 mb-1">Name *</label><input type="text" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" /></div>
-              <div><label className="block text-sm font-medium text-gray-700 mb-1">Phone</label><input type="text" value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" /></div>
-              <div><label className="block text-sm font-medium text-gray-700 mb-1">Email</label><input type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" /></div>
-              <div><label className="block text-sm font-medium text-gray-700 mb-1">Address</label><textarea value={form.address} onChange={e => setForm({ ...form, address: e.target.value })} rows={2} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" /></div>
+              <InputField label="Name *" name="name" type="text" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />
+              <InputField label="Phone" name="phone" type="text" value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} />
+              <InputField label="Email" name="email" type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} />
+              <Textarea label="Address" name="address" value={form.address} onChange={e => setForm({ ...form, address: e.target.value })} rows={2} />
             </div>
             <div className="flex justify-end gap-3 mt-6">
-              <button onClick={() => setShowModal(false)} className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50">Cancel</button>
-              <button onClick={handleSave} className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700">{editing ? 'Update' : 'Create'}</button>
+              <Button variant="ghost" onClick={() => setShowModal(false)}>Cancel</Button>
+              <Button variant="primary" onClick={handleSave}>{editing ? 'Update' : 'Create'}</Button>
             </div>
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        isOpen={deleteConfirmOpen}
+        onClose={() => { setDeleteConfirmOpen(false); setDeleteTarget(null) }}
+        onConfirm={() => { handleDelete(deleteTarget); setDeleteConfirmOpen(false); setDeleteTarget(null) }}
+        title="Delete Customer"
+        message="Are you sure you want to delete this customer? This action cannot be undone."
+        confirmText="Delete"
+        confirmVariant="danger"
+      />
     </div>
   )
 }

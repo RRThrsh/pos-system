@@ -3,6 +3,7 @@ import { usersApi } from '../../services/api.js'
 import Modal from '../../components/Modal.jsx'
 import Spinner from '../../components/Spinner.jsx'
 import Pagination, { PAGE_SIZE } from '../../components/Pagination.jsx'
+import { Button, InputField, Select, ConfirmDialog } from '../../components/index.js'
 import { useToast } from '../../context/ToastContext.jsx'
 import { useAuth } from '../../context/AuthContext.jsx'
 
@@ -17,6 +18,8 @@ function Users() {
   const [editing, setEditing] = useState(null)
   const [form, setForm] = useState(emptyForm)
   const [page, setPage] = useState(1)
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
+  const [deleteTarget, setDeleteTarget] = useState(null)
 
   const load = () => {
     setLoading(true)
@@ -101,7 +104,6 @@ function Users() {
       addToast('Cannot delete the only superadmin.', 'error')
       return
     }
-    if (!confirm('Delete this user?')) return
     try {
       await usersApi.remove(id)
       addToast('User deleted', 'success')
@@ -114,7 +116,7 @@ function Users() {
   return (
     <div>
       <div className="flex items-center justify-end mb-6">
-        <button onClick={openCreate} className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-indigo-500 transition-colors">+ Add User</button>
+        <Button variant="primary" onClick={openCreate}>+ Add User</Button>
       </div>
 
       {loading ? <Spinner /> : (
@@ -143,27 +145,30 @@ function Users() {
                   <td className="px-4 py-3 text-center">
                     {(currentUser?.role === 'superadmin' || currentUser?.role === 'admin') && (
                       <div className="flex items-center justify-center gap-3">
-                        <button onClick={() => openEdit(item)} className="inline-flex items-center gap-1 text-indigo-600 hover:text-indigo-800 text-sm font-medium">
-                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                        <Button variant="ghost" size="sm" onClick={() => openEdit(item)}>
+                          <svg className="w-4 h-4 inline mr-1" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" />
                           </svg>
                           Edit
-                        </button>
+                        </Button>
                         {(() => {
                           const isSelf = item._id === currentUser?.id
                           const isLastSuperadmin = item.role === 'superadmin' && superadminCount <= 1
                           const disabled = isSelf || isLastSuperadmin
                           return (
-                            <button
-                              onClick={() => !disabled && handleDelete(item._id || item.id, item)}
-                              className={`inline-flex items-center gap-1 text-sm font-medium ${disabled ? 'text-gray-300 cursor-not-allowed' : 'text-red-600 hover:text-red-800'}`}
+                            <Button
+                              variant="danger"
+                              size="sm"
+                              onClick={() => { if (!disabled) { setDeleteTarget(item); setDeleteConfirmOpen(true) } }}
+                              className={disabled ? 'opacity-50 cursor-not-allowed' : ''}
                               title={isSelf ? 'Cannot delete your own account' : isLastSuperadmin ? 'Cannot delete the only superadmin' : 'Delete user'}
+                              disabled={disabled}
                             >
-                              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                              <svg className="w-4 h-4 inline mr-1" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
                               </svg>
                               Delete
-                            </button>
+                            </Button>
                           )
                         })()}
                       </div>
@@ -180,47 +185,42 @@ function Users() {
         </div>
       )}
 
+      <ConfirmDialog
+        isOpen={deleteConfirmOpen}
+        onClose={() => { setDeleteConfirmOpen(false); setDeleteTarget(null) }}
+        onConfirm={() => { handleDelete(deleteTarget._id || deleteTarget.id, deleteTarget); setDeleteConfirmOpen(false); setDeleteTarget(null) }}
+        title="Delete User"
+        message="Are you sure you want to delete this user? This action cannot be undone."
+        confirmText="Delete"
+        confirmVariant="danger"
+      />
+
       <Modal isOpen={modalOpen} onClose={() => setModalOpen(false)} title={editing ? 'Edit User' : 'Add User'}>
         <form onSubmit={handleSave} className="space-y-3">
           <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">First Name</label>
-              <input required value={form.firstName} onChange={(e) => setForm({ ...form, firstName: e.target.value })} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Last Name</label>
-              <input required value={form.lastName} onChange={(e) => setForm({ ...form, lastName: e.target.value })} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20" />
-            </div>
+            <InputField label="First Name" name="firstName" required value={form.firstName} onChange={(e) => setForm({ ...form, firstName: e.target.value })} />
+            <InputField label="Last Name" name="lastName" required value={form.lastName} onChange={(e) => setForm({ ...form, lastName: e.target.value })} />
           </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Username</label>
-            <input required value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20" />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">{editing ? 'New Password (leave blank to keep)' : 'Password'}</label>
-            <input type="password" required={!editing} value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20" />
-          </div>
+          <InputField label="Username" name="username" required value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} />
+          <InputField label={editing ? 'New Password (leave blank to keep)' : 'Password'} name="password" type="password" required={!editing} value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />
           {editing && isSelf(editing) && form.password && (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Current Password</label>
-              <input type="password" required value={form.currentPassword} onChange={(e) => setForm({ ...form, currentPassword: e.target.value })} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20" />
-            </div>
+            <InputField label="Current Password" name="currentPassword" type="password" required value={form.currentPassword} onChange={(e) => setForm({ ...form, currentPassword: e.target.value })} />
           )}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Role</label>
             {editing && editing._id === currentUser?.id ? (
               <input type="text" value={form.role} disabled className="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-500 capitalize cursor-not-allowed" />
             ) : (
-              <select value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20">
+              <Select name="role" value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })}>
                 <option value="cashier">Cashier</option>
                 <option value="admin">Admin</option>
                 {(currentUser?.role === 'superadmin') && <option value="superadmin">Superadmin</option>}
-              </select>
+              </Select>
             )}
           </div>
           <div className="flex justify-end gap-3 pt-2">
-            <button type="button" onClick={() => setModalOpen(false)} className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800">Cancel</button>
-            <button type="submit" className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-indigo-500 transition-colors">{editing ? 'Update' : 'Create'}</button>
+            <Button variant="ghost" onClick={() => setModalOpen(false)}>Cancel</Button>
+            <Button variant="primary" type="submit">{editing ? 'Update' : 'Create'}</Button>
           </div>
         </form>
       </Modal>

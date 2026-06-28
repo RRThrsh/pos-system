@@ -112,6 +112,14 @@ export default defineSchema({
     createdAt: v.string(),
   }).index("by_createdAt", ["createdAt"]),
 
+  paymentMethods: defineTable({
+    name: v.string(),
+    description: v.optional(v.string()),
+    isActive: v.boolean(),
+    createdAt: v.string(),
+    updatedAt: v.string(),
+  }).index("by_name", ["name"]),
+
   permissions: defineTable({
     role: v.string(),
     page: v.string(),
