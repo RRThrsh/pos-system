@@ -26,6 +26,7 @@ import Expenses from './pages/dashboard/Expenses.jsx'
 import PromoCodes from './pages/dashboard/PromoCodes.jsx'
 import Customers from './pages/dashboard/Customers.jsx'
 import StockCounts from './pages/dashboard/StockCounts.jsx'
+import RegisterAccount from './pages/dashboard/RegisterAccount.jsx'
 
 function App() {
   return (
@@ -63,6 +64,7 @@ function App() {
               <Route path="/dashboard/customers" element={<Customers />} />
               <Route path="/dashboard/stock-counts" element={<StockCounts />} />
               <Route path="/dashboard/tables" element={<Tables />} />
+              <Route path="/dashboard/register" element={<RegisterAccount />} />
             </Route>
             <Route path="*" element={<Navigate to="/login" replace />} />
           </Routes>
