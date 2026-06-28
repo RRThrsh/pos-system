@@ -42,6 +42,9 @@ function Pos() {
   const [confirmingItem, setConfirmingItem] = useState(null)
   const [confirmFocusIndex, setConfirmFocusIndex] = useState(0)
   const voidModalRef = useRef(null)
+  const [chargeConfirmOpen, setChargeConfirmOpen] = useState(false)
+  const [chargeFocusIndex, setChargeFocusIndex] = useState(0)
+  const chargeModalRef = useRef(null)
 
   useEffect(() => {
     if (voidConfirmOpen) {
@@ -51,6 +54,13 @@ function Pos() {
       setTimeout(() => voidModalRef.current?.focus(), 50)
     }
   }, [voidConfirmOpen])
+
+  useEffect(() => {
+    if (chargeConfirmOpen) {
+      setChargeFocusIndex(0)
+      setTimeout(() => chargeModalRef.current?.focus(), 50)
+    }
+  }, [chargeConfirmOpen])
 
   const [categories, setCategories] = useState([])
   const [selectedCategory, setSelectedCategory] = useState('')
@@ -308,7 +318,7 @@ function Pos() {
   }, [cart.length, shortcuts])
 
   return (
-    <div className="flex gap-6 h-[calc(100vh-8rem)]">
+    <div className="flex p-8 gap-6 h-[calc(100vh-8rem)]">
       <div className="flex-1 flex flex-col">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-3">
@@ -522,7 +532,7 @@ function Pos() {
               disabled={!cart.length}
               className="flex-1 bg-red-500 text-white py-3 rounded-lg text-sm font-bold shadow-sm hover:bg-red-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >Void</button>
-            <button onClick={handleCheckout}
+            <button onClick={() => setChargeConfirmOpen(true)}
               disabled={!cart.length || submitting || (paymentMethod === 'cash' && (!amountPaid || parseFloat(amountPaid) < total))}
               className="flex-1 bg-green-600 text-white py-3 rounded-lg text-sm font-bold shadow-sm hover:bg-green-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >{submitting ? 'Processing...' : `Charge  \u20B1${total.toLocaleString()} (${shortcuts.charge?.key || 'F2'})`}</button>
@@ -546,32 +556,87 @@ function Pos() {
           }}
         >
           {confirmingItem ? (
-            <div className="space-y-4">
-              <p className="text-sm">Void <strong>{confirmingItem.name} x{confirmingItem.quantity}</strong> (&#8369;{(confirmingItem.price * confirmingItem.quantity).toLocaleString()})?</p>
-              <p className="text-xs text-gray-500">&#8592;/&#8594; to switch, Enter to select, Escape to exit.</p>
-              <div className="flex justify-end gap-2">
-                <button onClick={() => { setConfirmingItem(null); setTimeout(() => voidModalRef.current?.focus(), 50) }} className={`px-4 py-2 text-sm rounded-lg transition-colors ${confirmFocusIndex === 0 ? 'ring-2 ring-indigo-400 bg-gray-200 text-gray-700' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}>Cancel</button>
-                <button onClick={() => { confirmVoidItem() }} className={`px-4 py-2 text-sm rounded-lg transition-colors ${confirmFocusIndex === 1 ? 'ring-2 ring-indigo-400 bg-red-500 text-white' : 'bg-red-500 text-white hover:bg-red-600'}`}>Yes, void it</button>
+            <div className="space-y-5">
+              <div className="flex items-center gap-3 p-4 bg-red-50 rounded-lg border border-red-200">
+                <div className="flex-shrink-0 flex items-center justify-center w-10 h-10 rounded-full bg-red-100">
+                  <svg className="w-5 h-5 text-red-600" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" /></svg>
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-red-800">Void this item?</p>
+                  <p className="text-sm text-red-700"><strong>{confirmingItem.name}</strong> x{confirmingItem.quantity} &mdash; &#8369;{(confirmingItem.price * confirmingItem.quantity).toLocaleString()}</p>
+                </div>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-gray-400"><kbd className="px-1.5 py-0.5 bg-gray-100 border border-gray-300 rounded text-[10px] font-mono">&#8592;</kbd> <kbd className="px-1.5 py-0.5 bg-gray-100 border border-gray-300 rounded text-[10px] font-mono">&#8594;</kbd> navigate &middot; <kbd className="px-1.5 py-0.5 bg-gray-100 border border-gray-300 rounded text-[10px] font-mono">Enter</kbd> select &middot; <kbd className="px-1.5 py-0.5 bg-gray-100 border border-gray-300 rounded text-[10px] font-mono">Esc</kbd> exit</span>
+              </div>
+              <div className="flex justify-end gap-3">
+                <button onClick={() => { setConfirmingItem(null); setTimeout(() => voidModalRef.current?.focus(), 50) }} className={`px-5 py-2 text-sm font-medium rounded-lg transition-all ${confirmFocusIndex === 0 ? 'ring-2 ring-offset-1 ring-gray-400 bg-gray-200 text-gray-800' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>Cancel</button>
+                <button onClick={() => { confirmVoidItem() }} className={`px-5 py-2 text-sm font-medium rounded-lg transition-all ${confirmFocusIndex === 1 ? 'ring-2 ring-offset-1 ring-red-400 bg-red-600 text-white' : 'bg-red-500 text-white hover:bg-red-600'}`}>Yes, void it</button>
               </div>
             </div>
           ) : (
             <div className="space-y-3">
-              <p className="text-sm text-gray-600">Use up/down arrows to select, Enter to void.</p>
-              <div className="max-h-60 overflow-auto space-y-1">
+              <div className="flex items-center justify-between">
+                <p className="text-sm text-gray-500">Select an item to void</p>
+                <span className="text-[10px] text-gray-400"><kbd className="px-1.5 py-0.5 bg-gray-100 border border-gray-300 rounded text-[10px] font-mono">&#8593;</kbd> <kbd className="px-1.5 py-0.5 bg-gray-100 border border-gray-300 rounded text-[10px] font-mono">&#8595;</kbd> navigate &middot; <kbd className="px-1.5 py-0.5 bg-gray-100 border border-gray-300 rounded text-[10px] font-mono">Enter</kbd> select &middot; <kbd className="px-1.5 py-0.5 bg-gray-100 border border-gray-300 rounded text-[10px] font-mono">Esc</kbd> exit</span>
+              </div>
+              <div className="max-h-64 overflow-auto rounded-lg border border-gray-200 divide-y divide-gray-100">
                 {cart.map((c, i) => (
                   <div key={i}
                     onDoubleClick={() => setConfirmingItem(c)}
-                    className={`flex justify-between text-sm px-3 py-2 rounded-lg cursor-pointer transition-colors ${selectedVoidIndex === i ? 'bg-red-100 border border-red-300' : 'hover:bg-gray-100'}`}>
-                    <span>{c.name} x{c.quantity}</span>
-                    <span className="font-medium">&#8369;{(c.price * c.quantity).toLocaleString()}</span>
+                    className={`flex items-center justify-between px-4 py-3 text-sm cursor-pointer transition-all ${selectedVoidIndex === i ? 'bg-red-50 border-l-4 border-red-500 -ml-px' : 'hover:bg-gray-50 border-l-4 border-transparent'}`}>
+                    <div className="flex items-center gap-3 min-w-0">
+                      <span className={`flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-bold ${selectedVoidIndex === i ? 'bg-red-500 text-white' : 'bg-gray-200 text-gray-500'}`}>{i + 1}</span>
+                      <span className="truncate font-medium text-gray-800">{c.name}</span>
+                    </div>
+                    <div className="flex items-center gap-4 flex-shrink-0">
+                      <span className="text-gray-400">x{c.quantity}</span>
+                      <span className="font-semibold text-gray-900 w-20 text-right">&#8369;{(c.price * c.quantity).toLocaleString()}</span>
+                    </div>
                   </div>
                 ))}
               </div>
-              <div className="flex justify-end gap-2">
-                <button onClick={() => setVoidConfirmOpen(false)} className="px-4 py-2 text-sm bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors">Close</button>
+              <div className="flex justify-end">
+                <button onClick={() => setVoidConfirmOpen(false)} className="px-4 py-2 text-sm font-medium bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 transition-colors">Close</button>
               </div>
             </div>
           )}
+        </div>
+      </Modal>
+
+      <Modal isOpen={chargeConfirmOpen} onClose={() => setChargeConfirmOpen(false)} title="Confirm Charge">
+        <div className="space-y-4" tabIndex={0} ref={chargeModalRef}
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') { e.preventDefault(); setChargeConfirmOpen(false); return }
+            if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') { e.preventDefault(); setChargeFocusIndex((prev) => prev === 0 ? 1 : 0); return }
+            if (e.key === 'Enter') { e.preventDefault(); if (chargeFocusIndex === 1) { setChargeConfirmOpen(false); handleCheckout() } else { setChargeConfirmOpen(false) }; return }
+          }}
+        >
+          <div className="max-h-48 overflow-auto rounded-lg border border-gray-200 divide-y divide-gray-100">
+            {cart.map((c, i) => (
+              <div key={i} className="flex items-center justify-between px-4 py-2.5 text-sm">
+                <span className="truncate text-gray-800">{c.name} <span className="text-gray-400">x{c.quantity}</span></span>
+                <span className="font-medium text-gray-900">&#8369;{(c.price * c.quantity).toLocaleString()}</span>
+              </div>
+            ))}
+          </div>
+          <div className="space-y-1.5 text-sm">
+            <div className="flex justify-between text-gray-600"><span>Subtotal</span><span>&#8369;{subtotal.toLocaleString()}</span></div>
+            {(discAmount > 0 || promoDiscount > 0) && <div className="flex justify-between text-green-600"><span>Discount</span><span>-&#8369;{(discAmount + promoDiscount).toLocaleString()}</span></div>}
+            {taxAmount > 0 && <div className="flex justify-between text-gray-600"><span>Tax ({(taxRate).toFixed(1)}%)</span><span>&#8369;{taxAmount.toLocaleString()}</span></div>}
+            <div className="flex justify-between font-bold text-base border-t border-gray-200 pt-1.5"><span>Total</span><span>&#8369;{total.toLocaleString()}</span></div>
+            {paymentMethod === 'cash' && amountPaid && (
+              <div className="flex justify-between text-gray-600"><span>Amount Paid</span><span>&#8369;{parseFloat(amountPaid).toLocaleString()}</span></div>
+            )}
+            {change > 0 && <div className="flex justify-between text-gray-600"><span>Change</span><span>&#8369;{change.toLocaleString()}</span></div>}
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-gray-400"><kbd className="px-1.5 py-0.5 bg-gray-100 border border-gray-300 rounded text-[10px] font-mono">&#8592;</kbd> <kbd className="px-1.5 py-0.5 bg-gray-100 border border-gray-300 rounded text-[10px] font-mono">&#8594;</kbd> navigate &middot; <kbd className="px-1.5 py-0.5 bg-gray-100 border border-gray-300 rounded text-[10px] font-mono">Enter</kbd> confirm &middot; <kbd className="px-1.5 py-0.5 bg-gray-100 border border-gray-300 rounded text-[10px] font-mono">Esc</kbd> cancel</span>
+          </div>
+          <div className="flex justify-end gap-3">
+            <button onClick={() => setChargeConfirmOpen(false)} className={`px-5 py-2 text-sm font-medium rounded-lg transition-all ${chargeFocusIndex === 0 ? 'ring-2 ring-offset-1 ring-gray-400 bg-gray-200 text-gray-800' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>Cancel</button>
+            <button onClick={() => { setChargeConfirmOpen(false); handleCheckout() }} className={`px-5 py-2 text-sm font-medium rounded-lg transition-all ${chargeFocusIndex === 1 ? 'ring-2 ring-offset-1 ring-green-400 bg-green-600 text-white' : 'bg-green-500 text-white hover:bg-green-600'}`}>Confirm Charge</button>
+          </div>
         </div>
       </Modal>
 
