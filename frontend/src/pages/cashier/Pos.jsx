@@ -499,7 +499,7 @@ function Pos() {
             {paymentMethod === 'cash' && (
               <div className="mb-3">
                 <label className="block text-sm font-medium text-gray-700 mb-1">Amount Paid</label>
-                <input type="number" step="0.01" min="0" value={amountPaid} onChange={(e) => setAmountPaid(e.target.value)} placeholder="0.00" className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none" />
+                <input type="number" step="0.01" min="0" value={amountPaid} onChange={(e) => setAmountPaid(e.target.value.replace(/[^0-9.]/g, ''))} placeholder="0.00" className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none" />
               </div>
             )}
 
@@ -512,7 +512,7 @@ function Pos() {
           </div>
 
           <button onClick={handleCheckout}
-            disabled={!cart.length || submitting || (paymentMethod === 'cash' && amountPaid && parseFloat(amountPaid) < total)}
+            disabled={!cart.length || submitting || (paymentMethod === 'cash' && (!amountPaid || parseFloat(amountPaid) < total))}
             className="w-full bg-green-600 text-white py-3 rounded-lg text-sm font-bold shadow-sm hover:bg-green-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >{submitting ? 'Processing...' : `Charge  \u20B1${total.toLocaleString()} (${shortcuts.charge?.key || 'F2'})`}</button>
         </div>
