@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { productsApi, salesApi, promoCodesApi, configApi, heldOrdersApi, categoriesApi } from '../../services/api.js'
+import Modal from '../../components/Modal.jsx'
 import { useToast } from '../../context/ToastContext.jsx'
 import { getDefaultShortcuts } from '../../constants/shortcuts.js'
 
@@ -36,6 +37,20 @@ function Pos() {
 
   const [heldOrders, setHeldOrders] = useState([])
   const [showHeldOrders, setShowHeldOrders] = useState(false)
+  const [voidConfirmOpen, setVoidConfirmOpen] = useState(false)
+  const [selectedVoidIndex, setSelectedVoidIndex] = useState(0)
+  const [confirmingItem, setConfirmingItem] = useState(null)
+  const [confirmFocusIndex, setConfirmFocusIndex] = useState(0)
+  const voidModalRef = useRef(null)
+
+  useEffect(() => {
+    if (voidConfirmOpen) {
+      setSelectedVoidIndex(0)
+      setConfirmingItem(null)
+      setConfirmFocusIndex(0)
+      setTimeout(() => voidModalRef.current?.focus(), 50)
+    }
+  }, [voidConfirmOpen])
 
   const [categories, setCategories] = useState([])
   const [selectedCategory, setSelectedCategory] = useState('')
@@ -118,6 +133,22 @@ function Pos() {
     if (!cart.length) return
     setCart([])
     addToast('Cart cleared', 'info')
+  }
+
+  const removeFromCart = (id) => {
+    setCart((prev) => {
+      const next = prev.filter((c) => (c._id || c.id) !== id)
+      if (!next.length) setVoidConfirmOpen(false)
+      return next
+    })
+  }
+
+  const confirmVoidItem = () => {
+    const c = confirmingItem
+    if (!c) return
+    removeFromCart(c._id || c.id)
+    setConfirmingItem(null)
+    addToast(`${c.name} removed from cart`, 'info')
   }
 
   const subtotal = cart.reduce((sum, c) => sum + c.price * c.quantity, 0)
@@ -487,7 +518,7 @@ function Pos() {
             </div>
           </div>
           <div className="flex gap-2">
-            <button onClick={clearCart}
+            <button onClick={() => setVoidConfirmOpen(true)}
               disabled={!cart.length}
               className="flex-1 bg-red-500 text-white py-3 rounded-lg text-sm font-bold shadow-sm hover:bg-red-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >Void</button>
@@ -498,6 +529,51 @@ function Pos() {
           </div>
         </div>
       </div>
+
+      <Modal isOpen={voidConfirmOpen} onClose={() => setVoidConfirmOpen(false)} title="Void Item">
+        <div className="space-y-3" tabIndex={0} ref={voidModalRef}
+          onKeyDown={(e) => {
+            if (confirmingItem) {
+              if (e.key === 'Escape') { e.preventDefault(); setVoidConfirmOpen(false); return }
+              if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') { e.preventDefault(); setConfirmFocusIndex((prev) => prev === 0 ? 1 : 0); return }
+              if (e.key === 'Enter') { e.preventDefault(); if (confirmFocusIndex === 0) { setConfirmingItem(null); setTimeout(() => voidModalRef.current?.focus(), 50) } else { confirmVoidItem() }; return }
+              return
+            }
+            if (e.key === 'Escape') { e.preventDefault(); setVoidConfirmOpen(false); return }
+            if (e.key === 'ArrowDown') { e.preventDefault(); setSelectedVoidIndex((prev) => Math.min(prev + 1, cart.length - 1)) }
+            if (e.key === 'ArrowUp') { e.preventDefault(); setSelectedVoidIndex((prev) => Math.max(prev - 1, 0)) }
+            if (e.key === 'Enter') { e.preventDefault(); const c = cart[selectedVoidIndex]; if (c) { setConfirmingItem(c); setConfirmFocusIndex(1) } }
+          }}
+        >
+          {confirmingItem ? (
+            <div className="space-y-4">
+              <p className="text-sm">Void <strong>{confirmingItem.name} x{confirmingItem.quantity}</strong> (&#8369;{(confirmingItem.price * confirmingItem.quantity).toLocaleString()})?</p>
+              <p className="text-xs text-gray-500">&#8592;/&#8594; to switch, Enter to select, Escape to exit.</p>
+              <div className="flex justify-end gap-2">
+                <button onClick={() => { setConfirmingItem(null); setTimeout(() => voidModalRef.current?.focus(), 50) }} className={`px-4 py-2 text-sm rounded-lg transition-colors ${confirmFocusIndex === 0 ? 'ring-2 ring-indigo-400 bg-gray-200 text-gray-700' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}>Cancel</button>
+                <button onClick={() => { confirmVoidItem() }} className={`px-4 py-2 text-sm rounded-lg transition-colors ${confirmFocusIndex === 1 ? 'ring-2 ring-indigo-400 bg-red-500 text-white' : 'bg-red-500 text-white hover:bg-red-600'}`}>Yes, void it</button>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <p className="text-sm text-gray-600">Use up/down arrows to select, Enter to void.</p>
+              <div className="max-h-60 overflow-auto space-y-1">
+                {cart.map((c, i) => (
+                  <div key={i}
+                    onDoubleClick={() => setConfirmingItem(c)}
+                    className={`flex justify-between text-sm px-3 py-2 rounded-lg cursor-pointer transition-colors ${selectedVoidIndex === i ? 'bg-red-100 border border-red-300' : 'hover:bg-gray-100'}`}>
+                    <span>{c.name} x{c.quantity}</span>
+                    <span className="font-medium">&#8369;{(c.price * c.quantity).toLocaleString()}</span>
+                  </div>
+                ))}
+              </div>
+              <div className="flex justify-end gap-2">
+                <button onClick={() => setVoidConfirmOpen(false)} className="px-4 py-2 text-sm bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors">Close</button>
+              </div>
+            </div>
+          )}
+        </div>
+      </Modal>
 
       {showReceipt && lastSale && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setShowReceipt(false)}>
