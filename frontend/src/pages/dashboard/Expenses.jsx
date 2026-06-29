@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { expensesApi } from '../../services/api.js'
+import { expensesApi, paymentMethodsApi } from '../../services/api.js'
 import Modal from '../../components/Modal.jsx'
 import Spinner from '../../components/Spinner.jsx'
 import Pagination, { PAGE_SIZE } from '../../components/Pagination.jsx'
@@ -8,7 +8,7 @@ import { useToast } from '../../context/ToastContext.jsx'
 import { usePermission } from '../../hooks/usePermission.js'
 
 const expenseCategories = ['Utilities', 'Rent', 'Supplies', 'Maintenance', 'Salaries', 'Marketing', 'Transportation', 'Food', 'Other']
-const paymentMethods = ['Cash', 'GCash', 'Bank Transfer', 'Credit Card', 'Other']
+const fallbackPaymentMethods = ['Cash', 'GCash']
 
 function Expenses() {
   const { addToast } = useToast()
@@ -19,7 +19,8 @@ function Expenses() {
   const [page, setPage] = useState(1)
   const [modalOpen, setModalOpen] = useState(false)
   const [categoryFilter, setCategoryFilter] = useState('')
-  const [form, setForm] = useState({ description: '', amount: '', category: expenseCategories[0], paymentMethod: paymentMethods[0], reference: '' })
+  const [paymentMethods, setPaymentMethods] = useState(fallbackPaymentMethods)
+  const [form, setForm] = useState({ description: '', amount: '', category: expenseCategories[0], paymentMethod: fallbackPaymentMethods[0], reference: '' })
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState(null)
 
@@ -31,6 +32,16 @@ function Expenses() {
       .finally(() => setLoading(false))
   }
 
+  useEffect(() => {
+    paymentMethodsApi.getAll().then((res) => {
+      const methods = Array.isArray(res) ? res.filter((m) => m.isActive !== false && ['cash', 'gcash'].includes(m.name.toLowerCase())).map((m) => m.name) : []
+      if (methods.length) {
+        setPaymentMethods(methods)
+        setForm((prev) => ({ ...prev, paymentMethod: methods[0] }))
+      }
+    }).catch(() => {})
+  }, [])
+
   useEffect(() => { load() }, [page, categoryFilter])
 
   const handleCreate = async () => {
@@ -39,7 +50,7 @@ function Expenses() {
       await expensesApi.create({ ...form, amount: Number(form.amount) })
       addToast('Expense added', 'success')
       setModalOpen(false)
-      setForm({ description: '', amount: '', category: expenseCategories[0], paymentMethod: paymentMethods[0], reference: '' })
+      setForm({ description: '', amount: '', category: expenseCategories[0], paymentMethod: paymentMethods[0] || fallbackPaymentMethods[0], reference: '' })
       load()
     } catch (err) { addToast(err.message || 'Failed to create', 'error') }
   }

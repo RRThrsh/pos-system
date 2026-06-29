@@ -1,9 +1,19 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { productsApi, salesApi, promoCodesApi, configApi, heldOrdersApi, categoriesApi } from '../../services/api.js'
+import { productsApi, salesApi, promoCodesApi, configApi, heldOrdersApi, categoriesApi, paymentMethodsApi, paymentsApi } from '../../services/api.js'
 import Modal from '../../components/Modal.jsx'
 import { useToast } from '../../context/ToastContext.jsx'
 import { useAuth } from '../../context/AuthContext.jsx'
 import { getDefaultShortcuts } from '../../constants/shortcuts.js'
+
+const ICON_MAP = {
+  cash: <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M12 6v12m-3-2.818.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>,
+  card: <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 0 0 2.25-2.25V6.75A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25v10.5A2.25 2.25 0 0 0 4.5 19.5Z" /></svg>,
+  gcash: <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M10.5 1.5H8.25A2.25 2.25 0 0 0 6 3.75v16.5a2.25 2.25 0 0 0 2.25 2.25h7.5A2.25 2.25 0 0 0 18 20.25V3.75a2.25 2.25 0 0 0-2.25-2.25H13.5m-3 0V3h3V1.5m-3 0h3m-3 18.75h3" /></svg>,
+  maya: <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M21 12a2.25 2.25 0 0 0-2.25-2.25H15a3 3 0 1 1-6 0H5.25A2.25 2.25 0 0 0 3 12m18 0v6a2.25 2.25 0 0 1-2.25 2.25H5.25A2.25 2.25 0 0 1 3 18v-6m18 0V9M3 12V9m18 0a2.25 2.25 0 0 0-2.25-2.25H5.25A2.25 2.25 0 0 0 3 9m18 0V6a2.25 2.25 0 0 0-2.25-2.25H5.25A2.25 2.25 0 0 0 3 6v3" /></svg>,
+  bank: <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M12 21v-8.25M15.75 21v-8.25M8.25 21v-8.25M3 9l9-6 9 6m-1.5 12V10.332A48.36 48.36 0 0 0 12 9.75c-2.551 0-5.056.2-7.5.582V21M3 21h18M12 6.75h.008v.008H12V6.75Z" /></svg>,
+  wallet: <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M21 12a2.25 2.25 0 0 0-2.25-2.25H15a3 3 0 1 1-6 0H5.25A2.25 2.25 0 0 0 3 12m18 0v6a2.25 2.25 0 0 1-2.25 2.25H5.25A2.25 2.25 0 0 1 3 18v-6m18 0V9M3 12V9m18 0a2.25 2.25 0 0 0-2.25-2.25H5.25A2.25 2.25 0 0 0 3 9m18 0V6a2.25 2.25 0 0 0-2.25-2.25H5.25A2.25 2.25 0 0 0 3 6v3" /></svg>,
+  other: <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M12 6v12m-3-2.818.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>,
+}
 
 function Pos() {
   const { addToast } = useToast()
@@ -17,8 +27,12 @@ function Pos() {
   const [results, setResults] = useState([])
   const [cart, setCart] = useState([])
   const [paymentMethod, setPaymentMethod] = useState('cash')
+  const [paymentMethodsList, setPaymentMethodsList] = useState([])
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState(null)
   const [paymentDetails, setPaymentDetails] = useState({})
+  const [cardDetails, setCardDetails] = useState({ number: '', expiry: '', cvc: '', name: '' })
   const [amountPaid, setAmountPaid] = useState('')
+  const [processingPayment, setProcessingPayment] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [discount, setDiscount] = useState('')
   const [discountType, setDiscountType] = useState('fixed')
@@ -46,8 +60,13 @@ function Pos() {
   const [confirmFocusIndex, setConfirmFocusIndex] = useState(0)
   const voidModalRef = useRef(null)
   const [chargeConfirmOpen, setChargeConfirmOpen] = useState(false)
+  const [paymentDetailsOpen, setPaymentDetailsOpen] = useState(false)
+  const [gcashQrOpen, setGcashQrOpen] = useState(false)
+  const gcashQrCodeRef = useRef('')
+  const gcashPhoneRef = useRef('')
   const [chargeFocusIndex, setChargeFocusIndex] = useState(0)
   const chargeModalRef = useRef(null)
+  const scanInputRef = useRef(null)
 
   useEffect(() => {
     if (voidConfirmOpen) {
@@ -78,6 +97,7 @@ function Pos() {
         setQuickKeys(all.filter((p) => p.stock > 0).slice(0, 12))
       })
       .catch(() => {})
+    paymentMethodsApi.getAll().then((res) => { const pm = Array.isArray(res) ? res.filter((m) => m.isActive !== false && ['cash', 'gcash'].includes(m.name.toLowerCase())) : []; if (pm.length && !pm.find((m) => m.name.toLowerCase() === paymentMethod)) { setPaymentMethod(pm[0].name.toLowerCase()); setSelectedPaymentMethod(pm[0]) } setPaymentMethodsList(pm) }).catch(() => {})
     heldOrdersApi.getAll().then((res) => setHeldOrders(Array.isArray(res) ? res : [])).catch(() => {})
     if (!taxRateLoaded.current) {
       configApi.get('taxRate').then((res) => { if (res && res.value) setTaxRate(Number(res.value) || 0); taxRateLoaded.current = true }).catch(() => { taxRateLoaded.current = true })
@@ -108,6 +128,7 @@ function Pos() {
     if (!search.trim()) { setResults([]); return }
     const q = search.toLowerCase()
     setResults(products.filter((p) =>
+      p.stock > 0 &&
       (p.name.toLowerCase().includes(q) || p.sku?.toLowerCase().includes(q) || p.barcode?.toLowerCase().includes(q)) &&
       (!selectedCategory || p.category === selectedCategory || p.categoryId === selectedCategory)
     ))
@@ -124,6 +145,7 @@ function Pos() {
   useEffect(() => { if (barcode.length >= 4) handleBarcodeRef.current() }, [barcode])
 
   const addToCart = (product) => {
+    if ((product.stock ?? 0) <= 0) { addToast(`${product.name} is out of stock`, 'error'); return }
     if (!cart.length && !currentTid) setCurrentTid(generateTid())
     setCart((prev) => {
       const existing = prev.find((c) => (c._id || c.id) === (product._id || product.id))
@@ -207,7 +229,29 @@ function Pos() {
   const handleCheckout = async () => {
     if (!cart.length) return
     setSubmitting(true)
+
+    const method = selectedPaymentMethod || paymentMethodsList.find((m) => m.name.toLowerCase() === paymentMethod)
+    const hasGateway = method?.provider && method.apiKey && paymentMethod !== 'gcash'
+
     try {
+      let pmResult
+      if (hasGateway) {
+        setProcessingPayment(true)
+        pmResult = await paymentsApi.processPayment({
+          methodId: method._id || method.id,
+          amount: total,
+          cardDetails: method.provider === 'stripe' && paymentMethod !== 'cash' ? cardDetails : undefined,
+        })
+        setProcessingPayment(false)
+        if (pmResult.status !== 'succeeded' && pmResult.status !== 'requires_capture' && pmResult.status !== 'requires_confirmation') {
+          const paymentId = pmResult.id || 'unknown'
+          if (pmResult.status === 'failed' || pmResult.status === 'requires_payment_method' || pmResult.status === 'canceled') {
+            throw new Error(`Payment ${pmResult.status}. Please try again.`)
+          }
+          addToast(`Payment initiated (${paymentId}). Waiting for customer to complete...`, 'info')
+        }
+      }
+
       const tid = currentTid || generateTid()
       const sale = await salesApi.create({
         items: cart.map((c) => ({ productId: c._id || c.id, qty: c.quantity })),
@@ -216,6 +260,8 @@ function Pos() {
         paymentDetails: Object.keys(paymentDetails).length ? paymentDetails : undefined,
         discount: discValue, discountType, orderType: 'walk-in',
         promoCode: promoCode || undefined, tax: taxAmount || undefined, taxRate: taxRate || undefined,
+        paymentIntentId: pmResult?.id,
+        paymentStatus: pmResult?.status,
       })
       addToast('Sale completed!', 'success')
       setLastSale({
@@ -225,9 +271,12 @@ function Pos() {
         orderType: 'walk-in', transactionId: tid,
         promoCode: promoCode || undefined, receiptNumber: sale.receiptNumber,
       })
-      setCart([]); setCurrentTid(''); setAmountPaid(''); setDiscount(''); setPromoCode(''); setPromoDiscount(0); setPaymentDetails({})
+      setCart([]); setCurrentTid(''); setAmountPaid(''); setDiscount(''); setPromoCode(''); setPromoDiscount(0); setPaymentDetails({}); setCardDetails({ number: '', expiry: '', cvc: '', name: '' })
       setShowReceipt(true)
-    } catch (err) { addToast(err.message || 'Checkout failed', 'error') }
+    } catch (err) {
+      setProcessingPayment(false)
+      addToast(err.message || 'Checkout failed', 'error')
+    }
     finally { setSubmitting(false) }
   }
   handleCheckoutRef.current = handleCheckout
@@ -492,21 +541,22 @@ function Pos() {
 
             <div className="mb-3">
               <label className="block text-sm font-medium text-gray-700 mb-2">Payment Method</label>
-              <div className="grid grid-cols-4 gap-2">
-                {[
-                  { value: 'cash', label: 'Cash', icon: <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M12 6v12m-3-2.818.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg> },
-                  { value: 'card', label: 'Card', icon: <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 0 0 2.25-2.25V6.75A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25v10.5A2.25 2.25 0 0 0 4.5 19.5Z" /></svg> },
-                  { value: 'gcash', label: 'GCash', icon: <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M10.5 1.5H8.25A2.25 2.25 0 0 0 6 3.75v16.5a2.25 2.25 0 0 0 2.25 2.25h7.5A2.25 2.25 0 0 0 18 20.25V3.75a2.25 2.25 0 0 0-2.25-2.25H13.5m-3 0V3h3V1.5m-3 0h3m-3 18.75h3" /></svg> },
-                  { value: 'maya', label: 'Maya', icon: <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M21 12a2.25 2.25 0 0 0-2.25-2.25H15a3 3 0 1 1-6 0H5.25A2.25 2.25 0 0 0 3 12m18 0v6a2.25 2.25 0 0 1-2.25 2.25H5.25A2.25 2.25 0 0 1 3 18v-6m18 0V9M3 12V9m18 0a2.25 2.25 0 0 0-2.25-2.25H5.25A2.25 2.25 0 0 0 3 9m18 0V6a2.25 2.25 0 0 0-2.25-2.25H5.25A2.25 2.25 0 0 0 3 6v3" /></svg> },
-                ].map(({ value, label, icon }) => (
-                  <button key={value}
-                    onClick={() => setPaymentMethod(value)}
-                    className={`flex flex-col items-center gap-1.5 py-3 px-2 rounded-xl text-xs font-medium transition-all border-2 ${paymentMethod === value ? 'border-indigo-500 bg-indigo-50 text-indigo-700 shadow-sm' : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300 hover:bg-gray-50'}`}
-                  >
-                    {icon}
-                    <span>{label}</span>
-                  </button>
-                ))}
+              <div className="grid grid-cols-2 gap-2">
+                {(paymentMethodsList.length > 0 ? paymentMethodsList : [
+                  { name: 'Cash', icon: 'cash', fields: [] },
+                  { name: 'GCash', icon: 'gcash', fields: [] },
+                ]).map((m) => {
+                  const val = m.name.toLowerCase()
+                  return (
+                    <button key={val}
+                      onClick={() => { setPaymentMethod(val); setPaymentDetails({}); setSelectedPaymentMethod(m) }}
+                      className={`flex flex-col items-center gap-1.5 py-3 px-2 rounded-xl text-xs font-medium transition-all border-2 ${paymentMethod === val ? 'border-indigo-500 bg-indigo-50 text-indigo-700 shadow-sm' : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300 hover:bg-gray-50'}`}
+                    >
+                      {ICON_MAP[m.icon || 'other']}
+                      <span>{m.name}</span>
+                    </button>
+                  )
+                })}
               </div>
             </div>
 
@@ -523,55 +573,10 @@ function Pos() {
               </div>
             )}
 
-            {paymentMethod === 'card' && (
-              <div className="mb-3 space-y-2">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Card Type</label>
-                  <select value={paymentDetails.cardType || ''} onChange={(e) => setPaymentDetails((p) => ({ ...p, cardType: e.target.value }))} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none">
-                    <option value="">Select card type</option>
-                    <option value="visa">Visa</option>
-                    <option value="mastercard">Mastercard</option>
-                    <option value="amex">American Express</option>
-                    <option value="jcb">JCB</option>
-                    <option value="other">Other</option>
-                  </select>
-                </div>
-                <div className="flex gap-2">
-                  <div className="flex-1">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Last 4 Digits</label>
-                    <input type="text" maxLength={4} value={paymentDetails.cardLast4 || ''} onChange={(e) => setPaymentDetails((p) => ({ ...p, cardLast4: e.target.value.replace(/\D/g, '').slice(0, 4) }))} placeholder="1234" className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none" />
-                  </div>
-                  <div className="flex-1">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Reference #</label>
-                    <input type="text" value={paymentDetails.cardRef || ''} onChange={(e) => setPaymentDetails((p) => ({ ...p, cardRef: e.target.value }))} placeholder="Auth code" className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none" />
-                  </div>
-                </div>
-              </div>
-            )}
-
             {paymentMethod === 'gcash' && (
-              <div className="mb-3 space-y-2">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Reference Number</label>
-                  <input type="text" value={paymentDetails.gcashRef || ''} onChange={(e) => setPaymentDetails((p) => ({ ...p, gcashRef: e.target.value }))} placeholder="GCash reference #" className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none" />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Sender Name (optional)</label>
-                  <input type="text" value={paymentDetails.gcashSender || ''} onChange={(e) => setPaymentDetails((p) => ({ ...p, gcashSender: e.target.value }))} placeholder="Sender's full name" className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none" />
-                </div>
-              </div>
-            )}
-
-            {paymentMethod === 'maya' && (
-              <div className="mb-3 space-y-2">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Reference Number</label>
-                  <input type="text" value={paymentDetails.mayaRef || ''} onChange={(e) => setPaymentDetails((p) => ({ ...p, mayaRef: e.target.value }))} placeholder="Maya reference #" className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none" />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Account Name (optional)</label>
-                  <input type="text" value={paymentDetails.mayaAccount || ''} onChange={(e) => setPaymentDetails((p) => ({ ...p, mayaAccount: e.target.value }))} placeholder="Account holder name" className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none" />
-                </div>
+              <div className="mb-3 text-xs text-gray-400 flex items-center gap-1.5">
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M3.75 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 0 1 3.75 9.375v-4.5ZM3.75 14.625c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5a1.125 1.125 0 0 1-1.125-1.125v-4.5ZM13.5 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 0 1 13.5 9.375v-4.5Z" /></svg>
+                <span>Click Charge to show QR code for customer to scan.</span>
               </div>
             )}
 
@@ -606,8 +611,23 @@ function Pos() {
               disabled={!cart.length}
               className="flex-1 bg-red-500 text-white py-3 rounded-lg text-sm font-bold shadow-sm hover:bg-red-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >Void</button>
-            <button onClick={() => setChargeConfirmOpen(true)}
-              disabled={!cart.length || submitting || (paymentMethod === 'cash' && (!amountPaid || parseFloat(amountPaid) < total))}
+            <button onClick={() => {
+              if (paymentMethod === 'gcash') {
+                const gcash = selectedPaymentMethod || paymentMethodsList.find((m) => m.name.toLowerCase() === 'gcash')
+                gcashQrCodeRef.current = gcash?.qrCode || ''
+                gcashPhoneRef.current = (gcash?.qrCode || '').replace('gcash://pay/', '')
+                setGcashQrOpen(true)
+                return
+              }
+              const method = selectedPaymentMethod || paymentMethodsList.find((m) => m.name.toLowerCase() === paymentMethod)
+              const hasFields = method?.fields?.length > 0
+              if (paymentMethod !== 'cash' && hasFields) {
+                setPaymentDetailsOpen(true)
+              } else {
+                setChargeConfirmOpen(true)
+              }
+            }}
+              disabled={!cart.length || submitting || (paymentMethod === 'cash' && (!amountPaid || parseFloat(amountPaid) < total)) || processingPayment}
               className="flex-1 bg-green-600 text-white py-3 rounded-lg text-sm font-bold shadow-sm hover:bg-green-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >{submitting ? 'Processing...' : `Charge  \u20B1${total.toLocaleString()} (${shortcuts.charge?.key || 'F2'})`}</button>
           </div>
@@ -678,6 +698,116 @@ function Pos() {
         </div>
       </Modal>
 
+      <Modal isOpen={paymentDetailsOpen} onClose={() => setPaymentDetailsOpen(false)} title="Payment Details" size="lg">
+        {(() => {
+          const method = selectedPaymentMethod || paymentMethodsList.find((m) => m.name.toLowerCase() === paymentMethod)
+          const fields = method?.fields || []
+          const scanRef = paymentDetails.scannedRef || ''
+          const scanRefKey = fields.find((f) => /ref/i.test(f.key))?.key || 'scannedRef'
+          return (
+            <div className="space-y-4">
+              <p className="text-sm text-gray-500">Ask customer to scan the QR code or enter the reference number for <strong className="capitalize">{paymentMethod}</strong>.</p>
+
+              {method?.qrCode && (
+                <div className="flex flex-col items-center py-4">
+                  <div className="bg-white rounded-2xl border-2 border-dashed border-indigo-200 p-6 shadow-sm">
+                    <img src={`https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(method.qrCode)}`}
+                      alt="Payment QR Code" className="w-56 h-56" />
+                  </div>
+                  <p className="text-[10px] text-gray-400 mt-2">Customer: scan this QR with your {paymentMethod === 'gcash' ? 'GCash' : paymentMethod === 'maya' ? 'Maya' : 'payment'} app</p>
+                </div>
+              )}
+
+              <div className="border-2 border-dashed border-indigo-200 rounded-xl p-4 bg-indigo-50/50">
+                <label className="block text-xs font-medium text-indigo-700 mb-1.5 uppercase tracking-wider">Reference Number</label>
+                <div className="flex gap-2">
+                  <input ref={scanInputRef} type="text" value={scanRef}
+                    onChange={(e) => setPaymentDetails((p) => ({ ...p, [scanRefKey]: e.target.value }))}
+                    onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); document.getElementById('payment-continue-btn')?.click() } }}
+                    placeholder="Enter or scan reference number..." autoFocus
+                    className="flex-1 rounded-lg border border-indigo-200 px-3 py-2.5 text-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 focus:outline-none" />
+                  <button type="button" onClick={() => { const r = Date.now().toString(36).toUpperCase(); setPaymentDetails((p) => ({ ...p, [scanRefKey]: r })) }}
+                    className="shrink-0 px-3 py-2.5 text-xs font-medium text-indigo-700 bg-indigo-100 rounded-lg hover:bg-indigo-200 transition-colors flex items-center gap-1.5">
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M3.75 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 0 1 3.75 9.375v-4.5ZM3.75 14.625c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5a1.125 1.125 0 0 1-1.125-1.125v-4.5ZM13.5 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 0 1 13.5 9.375v-4.5Z" /></svg>
+                    Gen
+                  </button>
+                </div>
+                <p className="text-[10px] text-indigo-400 mt-1.5">After customer pays, enter the reference number shown in their app.</p>
+              </div>
+
+              {fields.length > 0 && (
+                <div className="border-t border-gray-100 pt-3 space-y-3">
+                  <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Additional Fields</p>
+                  {fields.map((f, i) => {
+                    if (f.key === scanRefKey) return null
+                    const val = paymentDetails[f.key] || ''
+                    const setVal = (v) => setPaymentDetails((p) => ({ ...p, [f.key]: v }))
+                    if (f.type === 'select') {
+                      return (
+                        <div key={i}>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">{f.label}{f.required ? ' *' : ''}</label>
+                          <select value={val} onChange={(e) => setVal(e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none">
+                            <option value="">{f.placeholder || `Select ${f.label}`}</option>
+                            {(f.options || []).map((o) => <option key={o} value={o}>{o}</option>)}
+                          </select>
+                        </div>
+                      )
+                    }
+                    return (
+                      <div key={i}>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">{f.label}{f.required ? ' *' : ''}</label>
+                        <input type={f.type === 'number' ? 'number' : 'text'}
+                          inputMode={f.type === 'number' ? 'decimal' : undefined}
+                          maxLength={f.maxLength || undefined}
+                          value={val}
+                          onChange={(e) => setVal(f.type === 'number' ? e.target.value.replace(/[^0-9.]/g, '') : f.maxLength ? e.target.value.slice(0, f.maxLength) : e.target.value)}
+                          placeholder={f.placeholder || ''}
+                          className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none" />
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+
+              <div className="flex justify-end gap-3 pt-2">
+                <button onClick={() => setPaymentDetailsOpen(false)} className="px-4 py-2 text-sm font-medium rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200">Cancel</button>
+                <button id="payment-continue-btn" onClick={() => { setPaymentDetailsOpen(false); setChargeConfirmOpen(true) }} className="px-4 py-2 text-sm font-medium rounded-lg bg-indigo-600 text-white hover:bg-indigo-500">Continue</button>
+              </div>
+            </div>
+          )
+        })()}
+      </Modal>
+
+      <Modal isOpen={gcashQrOpen} onClose={() => setGcashQrOpen(false)} title="Pay with GCash">
+        {(() => {
+          const phone = gcashPhoneRef.current.replace(/(\d{3})(\d{3})(\d{4})/, '$1 $2 $3')
+          return (
+            <div className="space-y-4 text-center">
+              {phone ? (
+                <>
+                  <p className="text-sm text-gray-500">Ask the customer to send payment to this GCash number:</p>
+                  <div className="bg-white rounded-2xl border-2 border-dashed border-emerald-200 p-6 shadow-sm inline-block">
+                    <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">GCash Number</p>
+                    <p className="text-2xl font-bold text-gray-900 tracking-wider">+63 {phone}</p>
+                  </div>
+                  <p className="text-xs text-gray-400">Once customer has paid, click Complete to finalize the sale.</p>
+                  <div className="flex justify-center gap-3 pt-2">
+                    <button onClick={() => setGcashQrOpen(false)} className="px-6 py-2.5 text-sm font-medium rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200">Cancel</button>
+                    <button onClick={() => { setGcashQrOpen(false); setChargeConfirmOpen(true) }} className="px-6 py-2.5 text-sm font-medium rounded-lg bg-green-600 text-white hover:bg-green-500">Complete Payment</button>
+                  </div>
+                </>
+              ) : (
+                <div className="py-8 text-sm text-gray-400">
+                  <p>No GCash number configured.</p>
+                  <p className="text-xs mt-1">Go to Dashboard → Payment → connect your GCash number.</p>
+                  <button onClick={() => setGcashQrOpen(false)} className="mt-4 px-6 py-2 text-sm font-medium rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200">Close</button>
+                </div>
+              )}
+            </div>
+          )
+        })()}
+      </Modal>
+
       <Modal isOpen={chargeConfirmOpen} onClose={() => setChargeConfirmOpen(false)} title="Confirm Charge">
         <div className="space-y-4" tabIndex={0} ref={chargeModalRef}
           onKeyDown={(e) => {
@@ -703,6 +833,31 @@ function Pos() {
               <div className="flex justify-between text-gray-600"><span>Amount Paid</span><span>&#8369;{parseFloat(amountPaid).toLocaleString()}</span></div>
             )}
             {change > 0 && <div className="flex justify-between text-gray-600"><span>Change</span><span>&#8369;{change.toLocaleString()}</span></div>}
+
+            {(() => {
+              const method = selectedPaymentMethod || paymentMethodsList.find((m) => m.name.toLowerCase() === paymentMethod)
+              if (!method?.provider || !method?.apiKey) return null
+              if (method.provider === 'stripe') {
+                return (
+                  <div className="border-t border-gray-200 pt-3 space-y-2">
+                    <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Card Payment</p>
+                    <input type="text" placeholder="Cardholder Name" value={cardDetails.name} onChange={(e) => setCardDetails((p) => ({ ...p, name: e.target.value }))} className="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none" />
+                    <input type="text" placeholder="Card Number" value={cardDetails.number} onChange={(e) => setCardDetails((p) => ({ ...p, number: e.target.value.replace(/[^0-9\s]/g, '').slice(0, 19) }))} className="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none" />
+                    <div className="grid grid-cols-2 gap-2">
+                      <input type="text" placeholder="MM/YY" value={cardDetails.expiry} onChange={(e) => setCardDetails((p) => ({ ...p, expiry: e.target.value.replace(/[^0-9\/]/g, '').slice(0, 5) }))} className="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none" />
+                      <input type="text" placeholder="CVC" value={cardDetails.cvc} onChange={(e) => setCardDetails((p) => ({ ...p, cvc: e.target.value.replace(/[^0-9]/g, '').slice(0, 4) }))} className="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none" />
+                    </div>
+                    <p className="text-[10px] text-gray-400">For sandbox testing, use card 4242 4242 4242 4242</p>
+                  </div>
+                )
+              }
+              return (
+                <div className="border-t border-gray-200 pt-3">
+                  <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">{method.provider === 'paymongo' ? 'PayMongo Payment' : 'Gateway Payment'}</p>
+                  <p className="text-xs text-gray-400 mt-1">Payment will be processed through {method.provider}.</p>
+                </div>
+              )
+            })()}
           </div>
           <div className="flex items-center justify-between">
             <span className="text-xs text-gray-400"><kbd className="px-1.5 py-0.5 bg-gray-100 border border-gray-300 rounded text-[10px] font-mono">&#8592;</kbd> <kbd className="px-1.5 py-0.5 bg-gray-100 border border-gray-300 rounded text-[10px] font-mono">&#8594;</kbd> navigate &middot; <kbd className="px-1.5 py-0.5 bg-gray-100 border border-gray-300 rounded text-[10px] font-mono">Enter</kbd> confirm &middot; <kbd className="px-1.5 py-0.5 bg-gray-100 border border-gray-300 rounded text-[10px] font-mono">Esc</kbd> cancel</span>

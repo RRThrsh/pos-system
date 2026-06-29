@@ -20,6 +20,7 @@ const heldOrderRoutes = require('./heldOrders')
 const customerRoutes = require('./customers')
 const stockCountRoutes = require('./stockCounts')
 const paymentMethodRoutes = require('./paymentMethods')
+const paymentRoutes = require('./payments')
 
 const router = Router()
 
@@ -43,5 +44,6 @@ router.use('/held-orders', heldOrderRoutes)
 router.use('/customers', customerRoutes)
 router.use('/stock-counts', stockCountRoutes)
 router.use('/payment-methods', paymentMethodRoutes)
+router.use('/payments', paymentRoutes)
 
 module.exports = router

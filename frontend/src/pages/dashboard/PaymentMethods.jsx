@@ -1,135 +1,219 @@
 import { useState, useEffect } from 'react'
 import { paymentMethodsApi } from '../../services/api.js'
-import Modal from '../../components/Modal.jsx'
 import Spinner from '../../components/Spinner.jsx'
-import Pagination, { PAGE_SIZE } from '../../components/Pagination.jsx'
-import { Button, InputField, ConfirmDialog } from '../../components/index.js'
 import { useToast } from '../../context/ToastContext.jsx'
 import { usePermission } from '../../hooks/usePermission.js'
 
-function PaymentMethods() {
+function Payment() {
   const { addToast } = useToast()
-  const { canWrite, canExecute } = usePermission('Payment Methods')
-  const [items, setItems] = useState([])
+  const { canWrite } = usePermission('Payment Methods')
   const [loading, setLoading] = useState(true)
-  const [modalOpen, setModalOpen] = useState(false)
-  const [editing, setEditing] = useState(null)
-  const [name, setName] = useState('')
-  const [description, setDescription] = useState('')
-  const [isActive, setIsActive] = useState(true)
-  const [page, setPage] = useState(1)
-  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
-  const [deleteTarget, setDeleteTarget] = useState(null)
+  const [saving, setSaving] = useState(false)
+  const [gcashMethod, setGcashMethod] = useState(null)
+  const [cashMethod, setCashMethod] = useState(null)
+  const [gcashNumber, setGcashNumber] = useState('')
+  const [connected, setConnected] = useState(false)
 
-  const load = () => {
+  const load = async () => {
     setLoading(true)
-    paymentMethodsApi.getAll()
-      .then((res) => setItems(res || []))
-      .catch((err) => addToast(err.message || 'Failed to load', 'error'))
-      .finally(() => setLoading(false))
+    try {
+      const res = await paymentMethodsApi.getAll()
+      const methods = Array.isArray(res) ? res : []
+      const gcash = methods.find((m) => m.name.toLowerCase() === 'gcash')
+      const cash = methods.find((m) => m.name.toLowerCase() === 'cash')
+      setGcashMethod(gcash || null)
+      setCashMethod(cash || null)
+      if (gcash?.qrCode) {
+        setGcashNumber(gcash.qrCode.replace('gcash://pay/', ''))
+        setConnected(true)
+      }
+    } catch (err) {
+      addToast(err.message || 'Failed to load', 'error')
+    } finally {
+      setLoading(false)
+    }
   }
 
   useEffect(() => { load() }, [])
 
-  const openCreate = () => { setEditing(null); setName(''); setDescription(''); setIsActive(true); setModalOpen(true) }
-  const openEdit = (item) => { setEditing(item); setName(item.name); setDescription(item.description || ''); setIsActive(item.isActive !== false); setModalOpen(true) }
+  const ensureGcashMethod = async () => {
+    if (gcashMethod) return gcashMethod._id || gcashMethod.id
+    const payload = {
+      name: 'GCash', description: 'GCash mobile payment', isActive: true,
+      icon: 'gcash', fields: [], provider: '', apiKey: '', publicKey: '', mode: 'sandbox', qrCode: '',
+    }
+    const created = await paymentMethodsApi.create(payload)
+    setGcashMethod(created)
+    return created._id || created.id
+  }
 
-  const handleSave = async (e) => {
-    e.preventDefault()
-    if (!name.trim()) return
+  const ensureCashMethod = async () => {
+    if (cashMethod) return
+    const payload = {
+      name: 'Cash', description: 'Cash payment', isActive: true,
+      icon: 'cash', fields: [], provider: '', apiKey: '', publicKey: '', mode: 'sandbox', qrCode: '',
+    }
+    const created = await paymentMethodsApi.create(payload)
+    setCashMethod(created)
+  }
+
+  const handleConnect = async () => {
+    const num = gcashNumber.replace(/\s/g, '')
+    if (!num) return addToast('Enter your GCash number', 'error')
+    if (num.length < 10) return addToast('Invalid GCash number', 'error')
+    setSaving(true)
     try {
-      if (editing) {
-        await paymentMethodsApi.update(editing._id || editing.id, { name: name.trim(), description: description.trim(), isActive })
-        addToast('Payment method updated', 'success')
-      } else {
-        await paymentMethodsApi.create({ name: name.trim(), description: description.trim(), isActive })
-        addToast('Payment method created', 'success')
-      }
-      setModalOpen(false)
+      const id = await ensureGcashMethod()
+      await paymentMethodsApi.update(id, {
+        name: 'GCash', description: 'GCash mobile payment', isActive: true,
+        icon: 'gcash', fields: [], provider: '', apiKey: undefined, publicKey: undefined, mode: 'sandbox',
+        qrCode: `gcash://pay/${num}`,
+      })
+      setConnected(true)
+      await ensureCashMethod()
+      addToast('GCash connected successfully!', 'success')
       load()
     } catch (err) {
-      addToast(err.message || 'Save failed', 'error')
+      addToast(err.message || 'Failed to connect GCash', 'error')
+    } finally {
+      setSaving(false)
     }
   }
 
-  const handleDelete = async (id) => {
+  const handleDisconnect = async () => {
+    if (!gcashMethod) return
+    setSaving(true)
     try {
-      await paymentMethodsApi.remove(id)
-      addToast('Payment method deleted', 'success')
+      const id = gcashMethod._id || gcashMethod.id
+      await paymentMethodsApi.update(id, {
+        name: 'GCash', description: 'GCash mobile payment', isActive: true,
+        icon: 'gcash', fields: [], provider: '', apiKey: '', publicKey: '', mode: 'sandbox',
+        qrCode: '',
+      })
+      setConnected(false)
+      setGcashNumber('')
+      addToast('GCash disconnected', 'success')
       load()
     } catch (err) {
-      addToast(err.message || 'Delete failed', 'error')
+      addToast(err.message || 'Failed to disconnect', 'error')
+    } finally {
+      setSaving(false)
     }
   }
+
+  if (loading) return <Spinner />
 
   return (
-    <div>
-      <div className="flex items-center justify-end mb-6">
-        {canWrite && <Button variant="primary" onClick={openCreate}>+ Add Payment Method</Button>}
+    <div className="max-w-2xl mx-auto space-y-6">
+      <div>
+        <h1 className="text-xl font-bold text-gray-900">Payment</h1>
+        <p className="text-sm text-gray-500 mt-1">Configure your payment methods for the POS.</p>
       </div>
 
-      {loading ? <Spinner /> : (
-        <div className="bg-white rounded-lg shadow overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-gray-50 text-gray-600">
-              <tr>
-                <th className="text-left px-4 py-3 font-medium">Name</th>
-                <th className="text-left px-4 py-3 font-medium">Description</th>
-                <th className="text-center px-4 py-3 font-medium">Status</th>
-                <th className="text-center px-4 py-3 font-medium">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {items.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE).map((item) => (
-                <tr key={item._id || item.id} className="hover:bg-gray-50">
-                  <td className="px-4 py-3 font-medium text-gray-900">{item.name}</td>
-                  <td className="px-4 py-3 text-gray-500">{item.description || '-'}</td>
-                  <td className="px-4 py-3 text-center">
-                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${item.isActive !== false ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                      {item.isActive !== false ? 'Active' : 'Inactive'}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-center">
-                    {canWrite && <Button variant="ghost" size="sm" onClick={() => openEdit(item)}>Edit</Button>}
-                    {canExecute && <Button variant="danger" size="sm" onClick={() => { setDeleteTarget(item._id || item.id); setDeleteConfirmOpen(true) }}>Delete</Button>}
-                  </td>
-                </tr>
-              ))}
-              {!items.length && (
-                <tr><td colSpan={4} className="text-center py-8 text-gray-400">No payment methods found.</td></tr>
-              )}
-            </tbody>
-          </table>
-          <Pagination items={items} currentPage={page} onPageChange={setPage} />
+      <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+        <div className="flex items-center gap-3 px-5 py-4 bg-emerald-50 border-b border-emerald-100">
+          <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-emerald-100 text-emerald-600">
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M10.5 1.5H8.25A2.25 2.25 0 0 0 6 3.75v16.5a2.25 2.25 0 0 0 2.25 2.25h7.5A2.25 2.25 0 0 0 18 20.25V3.75a2.25 2.25 0 0 0-2.25-2.25H13.5m-3 0V3h3V1.5m-3 0h3m-3 18.75h3" /></svg>
+          </div>
+          <div>
+            <h2 className="text-base font-semibold text-gray-900">GCash</h2>
+            <p className="text-xs text-gray-500">Connect your GCash account to receive payments</p>
+          </div>
+          {connected && (
+            <span className="ml-auto inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+              Connected
+            </span>
+          )}
         </div>
-      )}
 
-      <Modal isOpen={modalOpen} onClose={() => setModalOpen(false)} title={editing ? 'Edit Payment Method' : 'Add Payment Method'}>
-        <form onSubmit={handleSave} className="space-y-3">
-          <InputField label="Name" name="name" required value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Cash, GCash, Card" />
-          <InputField label="Description (optional)" name="description" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Brief description" />
-          <div className="flex items-center gap-2">
-            <input type="checkbox" id="isActive" checked={isActive} onChange={(e) => setIsActive(e.target.checked)} className="w-4 h-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" />
-            <label htmlFor="isActive" className="text-sm text-gray-700">Active</label>
-          </div>
-          <div className="flex justify-end gap-3 pt-2">
-            <Button variant="ghost" onClick={() => setModalOpen(false)}>Cancel</Button>
-            <Button variant="primary" type="submit">{editing ? 'Update' : 'Create'}</Button>
-          </div>
-        </form>
-      </Modal>
+        <div className="p-5 space-y-4">
+          {!connected ? (
+            <>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">GCash Mobile Number</label>
+                <div className="flex gap-2">
+                  <div className="relative flex-1">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-400 font-medium">+63</span>
+                    <input type="tel" value={gcashNumber} onChange={(e) => {
+                      const v = e.target.value.replace(/[^0-9]/g, '').slice(0, 10)
+                      setGcashNumber(v)
+                    }} placeholder="912 345 6789" autoFocus
+                      className="w-full rounded-xl border border-gray-300 pl-11 pr-3 py-2.5 text-sm focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100 focus:outline-none" />
+                  </div>
+                  <button onClick={handleConnect} disabled={saving || gcashNumber.length < 10}
+                    className="px-5 py-2.5 text-sm font-semibold text-white bg-emerald-600 rounded-xl hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-sm"
+                  >{saving ? 'Connecting...' : 'Connect'}</button>
+                </div>
+                <p className="text-xs text-gray-400 mt-1.5">Enter the mobile number registered with your GCash account.</p>
+              </div>
 
-      <ConfirmDialog
-        isOpen={deleteConfirmOpen}
-        onClose={() => { setDeleteConfirmOpen(false); setDeleteTarget(null) }}
-        onConfirm={() => { handleDelete(deleteTarget); setDeleteConfirmOpen(false); setDeleteTarget(null) }}
-        title="Delete Payment Method"
-        message="Are you sure you want to delete this payment method? This action cannot be undone."
-        confirmText="Delete"
-        confirmVariant="danger"
-      />
+              <div className="bg-gray-50 rounded-xl p-4 border border-dashed border-gray-200">
+                <div className="flex items-start gap-3">
+                  <svg className="w-5 h-5 text-gray-400 mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008Z" /></svg>
+                  <div>
+                    <p className="text-sm text-gray-600 font-medium">How it works</p>
+                    <ul className="text-xs text-gray-500 mt-1.5 space-y-1">
+                      <li>• Enter your GCash-registered mobile number</li>
+                      <li>• The POS will display your number at checkout</li>
+                      <li>• Customer sends payment to the number via GCash app, then cashier completes the sale</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="flex items-center gap-4">
+                <div className="bg-white rounded-xl border-2 border-dashed border-emerald-200 p-3 shadow-sm">
+                  <img src={`https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent('gcash://pay/' + gcashNumber)}`}
+                    alt="GCash QR" className="w-32 h-32" />
+                </div>
+                <div className="space-y-2">
+                  <div>
+                    <span className="text-xs text-gray-400 uppercase tracking-wider">Connected Account</span>
+                    <p className="text-sm font-semibold text-gray-900">+63 {gcashNumber.replace(/(\d{3})(\d{3})(\d{4})/, '$1 $2 $3')}</p>
+                  </div>
+                  <button onClick={handleDisconnect} disabled={saving}
+                    className="text-xs font-medium text-red-500 hover:text-red-600 transition-colors"
+                  >{saving ? 'Disconnecting...' : 'Disconnect'}</button>
+                </div>
+              </div>
+
+              <div className="bg-emerald-50 rounded-xl p-4 border border-emerald-100">
+                <div className="flex items-start gap-3">
+                  <svg className="w-5 h-5 text-emerald-500 mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>
+                  <div>
+                    <p className="text-sm text-emerald-800 font-medium">Ready to receive payments</p>
+                    <p className="text-xs text-emerald-600 mt-0.5">When a customer selects GCash in POS, your number will be displayed for them to send payment.</p>
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+
+      <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+        <div className="flex items-center gap-3 px-5 py-4 border-b border-gray-100">
+          <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-gray-100 text-gray-500">
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M12 6v12m-3-2.818.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>
+          </div>
+          <div>
+            <h2 className="text-base font-semibold text-gray-900">Cash</h2>
+            <p className="text-xs text-gray-500">Cash payments are always available in the POS</p>
+          </div>
+          <span className="ml-auto inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+            Active
+          </span>
+        </div>
+        <div className="p-5">
+          <p className="text-sm text-gray-600">No configuration needed. Cashier enters the amount paid and receives change automatically.</p>
+        </div>
+      </div>
     </div>
   )
 }
 
-export default PaymentMethods
+export default Payment

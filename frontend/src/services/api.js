@@ -196,6 +196,14 @@ export const paymentMethodsApi = {
   remove: (id) => request(`/payment-methods/${id}`, { method: 'DELETE' }),
 }
 
+export const paymentsApi = {
+  createPaymentIntent: (payload) => request('/payments/create-payment-intent', { method: 'POST', body: JSON.stringify(payload) }),
+  confirmPayment: (payload) => request('/payments/confirm-payment', { method: 'POST', body: JSON.stringify(payload) }),
+  processPayment: (payload) => request('/payments/process', { method: 'POST', body: JSON.stringify(payload) }),
+  checkStatus: (payload) => request('/payments/check-status', { method: 'POST', body: JSON.stringify(payload) }),
+  refund: (payload) => request('/payments/refund', { method: 'POST', body: JSON.stringify(payload) }),
+}
+
 export const tablesApi = {
   getAll: () => request('/tables'),
   create: (payload) => request('/tables', { method: 'POST', body: JSON.stringify(payload) }),

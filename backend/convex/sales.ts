@@ -57,8 +57,10 @@ export const create = mutation({
     customerPhone: v.optional(v.string()),
     buyerTin: v.optional(v.string()),
     notes: v.optional(v.string()),
+    paymentIntentId: v.optional(v.string()),
+    paymentStatus: v.optional(v.string()),
   },
-  handler: async (ctx, { items, transactionId, receiptNumber, paymentMethod, amountPaid, discount, discountType, orderType, promoCode, tax, taxRate, createdBy, customerId, customerName, customerPhone, buyerTin, notes }) => {
+  handler: async (ctx, { items, transactionId, receiptNumber, paymentMethod, amountPaid, discount, discountType, orderType, promoCode, tax, taxRate, createdBy, customerId, customerName, customerPhone, buyerTin, notes, paymentIntentId, paymentStatus }) => {
     const saleItems = []
     let subtotal = 0
 
@@ -122,6 +124,8 @@ export const create = mutation({
       createdBy,
       createdAt: new Date().toISOString(),
       voidedAt: undefined,
+      paymentIntentId,
+      paymentStatus,
     })
   },
 })
@@ -212,5 +216,13 @@ export const nextReceiptNumber = mutation({
       await ctx.db.insert("config", { key: "receiptSequence", value: String(next), updatedAt: new Date().toISOString() })
     }
     return { number: `${ptuPrefix}${String(next).padStart(8, "0")}`, sequence: next }
+  },
+})
+
+export const updatePaymentStatus = mutation({
+  args: { id: v.id("sales"), paymentStatus: v.string() },
+  handler: async (ctx, { id, paymentStatus }) => {
+    await ctx.db.patch(id, { paymentStatus, updatedAt: new Date().toISOString() })
+    return await ctx.db.get(id)
   },
 })

@@ -19,7 +19,7 @@ exports.getById = async (req, res) => {
 }
 
 exports.create = async (req, res) => {
-  const { items, transactionId, paymentMethod, amountPaid, discount, discountType, orderType, promoCode, tax, taxRate, customerId, customerName, customerPhone, buyerTin, notes, itemNotes } = req.body
+  const { items, transactionId, paymentMethod, amountPaid, discount, discountType, orderType, promoCode, tax, taxRate, customerId, customerName, customerPhone, buyerTin, notes, itemNotes, paymentIntentId, paymentStatus } = req.body
 
   if (!items || !items.length) {
     return res.status(400).json({ message: "Sale must include at least one item." })
@@ -44,11 +44,13 @@ exports.create = async (req, res) => {
       customerPhone,
       buyerTin,
       notes,
+      paymentIntentId,
+      paymentStatus,
       createdBy: req.user?.id,
     })
     const sale = await client.query(ref("sales:getById"), { id })
     if (promoCode) {
-      client.mutation(ref("promoCodes:incrementUseCount"), { code: promoCode }).catch(() => {})
+      client.mutation(ref("promoCodes:incrementUseCount"), { code: promoCode }).catch((err) => console.warn("Promo code increment skipped:", err.message))
     }
     await audit.log("create_sale", req, { details: `Sale #${receiptNumber || sale.transactionId || id} - ₱${sale.total} (${items.length} items)`, itemId: id })
     res.status(201).json(sale)
