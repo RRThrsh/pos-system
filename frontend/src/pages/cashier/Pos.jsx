@@ -124,6 +124,7 @@ function Pos() {
     if (!search.trim()) { setResults([]); return }
     const q = search.toLowerCase()
     setResults(products.filter((p) =>
+      p.stock > 0 &&
       (p.name.toLowerCase().includes(q) || p.sku?.toLowerCase().includes(q) || p.barcode?.toLowerCase().includes(q)) &&
       (!selectedCategory || p.category === selectedCategory || p.categoryId === selectedCategory)
     ))
