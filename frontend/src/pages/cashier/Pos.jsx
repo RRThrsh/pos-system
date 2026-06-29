@@ -62,6 +62,8 @@ function Pos() {
   const [chargeConfirmOpen, setChargeConfirmOpen] = useState(false)
   const [paymentDetailsOpen, setPaymentDetailsOpen] = useState(false)
   const [gcashQrOpen, setGcashQrOpen] = useState(false)
+  const gcashQrCodeRef = useRef('')
+  const gcashPhoneRef = useRef('')
   const [chargeFocusIndex, setChargeFocusIndex] = useState(0)
   const chargeModalRef = useRef(null)
   const scanInputRef = useRef(null)
@@ -229,7 +231,7 @@ function Pos() {
     setSubmitting(true)
 
     const method = selectedPaymentMethod || paymentMethodsList.find((m) => m.name.toLowerCase() === paymentMethod)
-    const hasGateway = method?.provider && method.apiKey
+    const hasGateway = method?.provider && method.apiKey && paymentMethod !== 'gcash'
 
     try {
       let pmResult
@@ -610,7 +612,13 @@ function Pos() {
               className="flex-1 bg-red-500 text-white py-3 rounded-lg text-sm font-bold shadow-sm hover:bg-red-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >Void</button>
             <button onClick={() => {
-              if (paymentMethod === 'gcash') { setGcashQrOpen(true); return }
+              if (paymentMethod === 'gcash') {
+                const gcash = selectedPaymentMethod || paymentMethodsList.find((m) => m.name.toLowerCase() === 'gcash')
+                gcashQrCodeRef.current = gcash?.qrCode || ''
+                gcashPhoneRef.current = (gcash?.qrCode || '').replace('gcash://pay/', '')
+                setGcashQrOpen(true)
+                return
+              }
               const method = selectedPaymentMethod || paymentMethodsList.find((m) => m.name.toLowerCase() === paymentMethod)
               const hasFields = method?.fields?.length > 0
               if (paymentMethod !== 'cash' && hasFields) {
@@ -770,21 +778,17 @@ function Pos() {
         })()}
       </Modal>
 
-      <Modal isOpen={gcashQrOpen} onClose={() => setGcashQrOpen(false)} title="Scan to Pay with GCash">
+      <Modal isOpen={gcashQrOpen} onClose={() => setGcashQrOpen(false)} title="Pay with GCash">
         {(() => {
-          const gcashData = paymentMethodsList.length > 0
-            ? paymentMethodsList.find((m) => m.name.toLowerCase() === 'gcash')
-            : { name: 'GCash', icon: 'gcash', fields: [], qrCode: null }
+          const phone = gcashPhoneRef.current.replace(/(\d{3})(\d{3})(\d{4})/, '$1 $2 $3')
           return (
             <div className="space-y-4 text-center">
-              <p className="text-sm text-gray-500">Ask the customer to scan this QR code with their GCash app.</p>
-              {gcashData?.qrCode ? (
+              {phone ? (
                 <>
-                  <div className="flex justify-center py-4">
-                    <div className="bg-white rounded-2xl border-2 border-dashed border-indigo-200 p-6 shadow-sm inline-block">
-                      <img src={`https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(gcashData.qrCode)}`}
-                        alt="GCash QR" className="w-72 h-72" />
-                    </div>
+                  <p className="text-sm text-gray-500">Ask the customer to send payment to this GCash number:</p>
+                  <div className="bg-white rounded-2xl border-2 border-dashed border-emerald-200 p-6 shadow-sm inline-block">
+                    <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">GCash Number</p>
+                    <p className="text-2xl font-bold text-gray-900 tracking-wider">+63 {phone}</p>
                   </div>
                   <p className="text-xs text-gray-400">Once customer has paid, click Complete to finalize the sale.</p>
                   <div className="flex justify-center gap-3 pt-2">
@@ -794,8 +798,8 @@ function Pos() {
                 </>
               ) : (
                 <div className="py-8 text-sm text-gray-400">
-                  <p>No QR code configured for GCash.</p>
-                  <p className="text-xs mt-1">Go to Dashboard → Payment Methods → edit GCash → set QR Code Data.</p>
+                  <p>No GCash number configured.</p>
+                  <p className="text-xs mt-1">Go to Dashboard → Payment → connect your GCash number.</p>
                   <button onClick={() => setGcashQrOpen(false)} className="mt-4 px-6 py-2 text-sm font-medium rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200">Close</button>
                 </div>
               )}

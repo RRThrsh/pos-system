@@ -38,32 +38,6 @@ exports.createPaymentIntent = async (req, res) => {
       })
     }
 
-    if (method.provider === "hitpay") {
-      const baseUrl = method.mode === "live" ? "https://api.hit-pay.com" : "https://api.sandbox.hit-pay.com"
-      const response = await fetch(`${baseUrl}/v1/payment-requests`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-BUSINESS-API-KEY": method.apiKey,
-        },
-        body: JSON.stringify({
-          amount: Number(amount).toFixed(2),
-          currency: currency.toUpperCase(),
-          reference_number: `POS-${Date.now()}`,
-          redirect_url: `${req.protocol}://${req.get("host")}/api/payments/hitpay-callback`,
-          webhook: `${req.protocol}://${req.get("host")}/api/payments/hitpay-webhook`,
-        }),
-      })
-      const data = await response.json()
-      if (!response.ok) throw new Error(data.message || data.error || "HitPay error")
-      return res.json({
-        id: data.id,
-        status: data.status,
-        url: data.url,
-        reference_number: data.reference_number,
-      })
-    }
-
     return res.status(400).json({ message: `Unsupported payment provider: ${method.provider || "none"}` })
   } catch (error) {
     console.error("Payment intent error:", error)
@@ -141,33 +115,7 @@ exports.processPayment = async (req, res) => {
       })
     }
 
-    if (method.provider === "hitpay") {
-      const baseUrl = method.mode === "live" ? "https://api.hit-pay.com" : "https://api.sandbox.hit-pay.com"
-      const response = await fetch(`${baseUrl}/v1/payment-requests`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-BUSINESS-API-KEY": method.apiKey,
-        },
-        body: JSON.stringify({
-          amount: Number(amount).toFixed(2),
-          currency: currency.toUpperCase(),
-          reference_number: `POS-${Date.now()}`,
-          redirect_url: `${req.protocol}://${req.get("host")}/api/payments/hitpay-callback`,
-          webhook: `${req.protocol}://${req.get("host")}/api/payments/hitpay-webhook`,
-        }),
-      })
-      const data = await response.json()
-      if (!response.ok) throw new Error(data.message || data.error || "HitPay error")
-      return res.json({
-        id: data.id,
-        status: data.status,
-        url: data.url,
-        reference_number: data.reference_number,
-      })
-    }
-
-    return res.status(400).json({ message: `Unsupported provider: ${method.provider}` })
+    return res.json({ id: null, status: 'noop', message: 'Manual payment – no gateway processing.' })
   } catch (error) {
     console.error("Payment processing error:", error)
     res.status(500).json({ message: error.message || "Payment processing failed." })
@@ -199,17 +147,7 @@ exports.confirmPayment = async (req, res) => {
       return res.json({ id: data.data.id, status: data.data.attributes.status })
     }
 
-    if (method.provider === "hitpay") {
-      const baseUrl = method.mode === "live" ? "https://api.hit-pay.com" : "https://api.sandbox.hit-pay.com"
-      const response = await fetch(`${baseUrl}/v1/payment-requests/${paymentIntentId}`, {
-        headers: { "X-BUSINESS-API-KEY": method.apiKey },
-      })
-      const data = await response.json()
-      if (!response.ok) throw new Error(data.message || data.error || "HitPay error")
-      return res.json({ id: data.id, status: data.status })
-    }
-
-    return res.status(400).json({ message: `Unsupported provider: ${method.provider}` })
+    return res.json({ id: paymentIntentId, status: 'noop', message: 'Manual payment – no gateway processing.' })
   } catch (error) {
     console.error("Payment confirm error:", error)
     res.status(500).json({ message: error.message || "Failed to confirm payment." })
@@ -235,14 +173,6 @@ exports.checkPaymentStatus = async (req, res) => {
       const data = await response.json()
       if (!response.ok) throw new Error(data.errors?.[0]?.detail || "PayMongo error")
       status = data.data.attributes.status
-    } else if (method?.provider === "hitpay") {
-      const baseUrl = method.mode === "live" ? "https://api.hit-pay.com" : "https://api.sandbox.hit-pay.com"
-      const response = await fetch(`${baseUrl}/v1/payment-requests/${paymentIntentId}`, {
-        headers: { "X-BUSINESS-API-KEY": apiKey },
-      })
-      const data = await response.json()
-      if (!response.ok) throw new Error(data.message || data.error || "HitPay error")
-      status = data.status
     } else {
       const Stripe = require("stripe")
       const stripe = Stripe(apiKey)
@@ -283,20 +213,6 @@ exports.refundPayment = async (req, res) => {
       return res.json({ id: data.data.id, status: data.data.attributes.status })
     }
 
-    if (method?.provider === "hitpay") {
-      const baseUrl = method.mode === "live" ? "https://api.hit-pay.com" : "https://api.sandbox.hit-pay.com"
-      const response = await fetch(`${baseUrl}/v1/payment-requests/${paymentIntentId}/refund`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-BUSINESS-API-KEY": apiKey,
-        },
-      })
-      const data = await response.json()
-      if (!response.ok) throw new Error(data.message || data.error || "HitPay refund error")
-      return res.json({ id: data.id, status: data.status })
-    }
-
     const Stripe = require("stripe")
     const stripe = Stripe(apiKey)
     const refund = await stripe.refunds.create({
@@ -308,16 +224,4 @@ exports.refundPayment = async (req, res) => {
     console.error("Refund error:", error)
     res.status(500).json({ message: error.message || "Refund failed." })
   }
-}
-
-exports.hitpayCallback = async (req, res) => {
-  const { payment_id, status, reference_number } = req.query
-  console.log(`HitPay callback: payment=${payment_id}, status=${status}, ref=${reference_number}`)
-  res.redirect(`${process.env.FRONTEND_URL || "http://localhost:3000"}/cashier?payment=${payment_id}&status=${status}`)
-}
-
-exports.hitpayWebhook = async (req, res) => {
-  const { payment_id, status, reference_number } = req.body
-  console.log(`HitPay webhook: payment=${payment_id}, status=${status}, ref=${reference_number}`)
-  res.json({ received: true })
 }
