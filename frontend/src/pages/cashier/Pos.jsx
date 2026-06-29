@@ -61,8 +61,10 @@ function Pos() {
   const voidModalRef = useRef(null)
   const [chargeConfirmOpen, setChargeConfirmOpen] = useState(false)
   const [paymentDetailsOpen, setPaymentDetailsOpen] = useState(false)
+  const [gcashQrOpen, setGcashQrOpen] = useState(false)
   const [chargeFocusIndex, setChargeFocusIndex] = useState(0)
   const chargeModalRef = useRef(null)
+  const scanInputRef = useRef(null)
 
   useEffect(() => {
     if (voidConfirmOpen) {
@@ -93,7 +95,7 @@ function Pos() {
         setQuickKeys(all.filter((p) => p.stock > 0).slice(0, 12))
       })
       .catch(() => {})
-    paymentMethodsApi.getAll().then((res) => { const pm = Array.isArray(res) ? res.filter((m) => m.isActive !== false) : []; if (pm.length && !pm.find((m) => m.name.toLowerCase() === paymentMethod)) { setPaymentMethod(pm[0].name.toLowerCase()); setSelectedPaymentMethod(pm[0]) } setPaymentMethodsList(pm) }).catch(() => {})
+    paymentMethodsApi.getAll().then((res) => { const pm = Array.isArray(res) ? res.filter((m) => m.isActive !== false && ['cash', 'gcash'].includes(m.name.toLowerCase())) : []; if (pm.length && !pm.find((m) => m.name.toLowerCase() === paymentMethod)) { setPaymentMethod(pm[0].name.toLowerCase()); setSelectedPaymentMethod(pm[0]) } setPaymentMethodsList(pm) }).catch(() => {})
     heldOrdersApi.getAll().then((res) => setHeldOrders(Array.isArray(res) ? res : [])).catch(() => {})
     if (!taxRateLoaded.current) {
       configApi.get('taxRate').then((res) => { if (res && res.value) setTaxRate(Number(res.value) || 0); taxRateLoaded.current = true }).catch(() => { taxRateLoaded.current = true })
@@ -141,6 +143,7 @@ function Pos() {
   useEffect(() => { if (barcode.length >= 4) handleBarcodeRef.current() }, [barcode])
 
   const addToCart = (product) => {
+    if ((product.stock ?? 0) <= 0) { addToast(`${product.name} is out of stock`, 'error'); return }
     if (!cart.length && !currentTid) setCurrentTid(generateTid())
     setCart((prev) => {
       const existing = prev.find((c) => (c._id || c.id) === (product._id || product.id))
@@ -536,12 +539,10 @@ function Pos() {
 
             <div className="mb-3">
               <label className="block text-sm font-medium text-gray-700 mb-2">Payment Method</label>
-              <div className="grid grid-cols-4 gap-2">
+              <div className="grid grid-cols-2 gap-2">
                 {(paymentMethodsList.length > 0 ? paymentMethodsList : [
                   { name: 'Cash', icon: 'cash', fields: [] },
-                  { name: 'Card', icon: 'card', fields: [{ label: 'Card Type', key: 'cardType', type: 'select', required: true, options: ['Visa', 'Mastercard', 'Amex', 'JCB', 'Other'] }, { label: 'Last 4 Digits', key: 'cardLast4', type: 'text', required: true, maxLength: 4 }, { label: 'Reference #', key: 'cardRef', type: 'text', placeholder: 'Auth code' }] },
-                  { name: 'GCash', icon: 'gcash', fields: [{ label: 'Reference Number', key: 'gcashRef', type: 'text', required: true, placeholder: 'GCash reference #' }, { label: 'Sender Name', key: 'gcashSender', type: 'text', placeholder: "Sender's full name" }] },
-                  { name: 'Maya', icon: 'maya', fields: [{ label: 'Reference Number', key: 'mayaRef', type: 'text', required: true, placeholder: 'Maya reference #' }, { label: 'Account Name', key: 'mayaAccount', type: 'text', placeholder: 'Account holder name' }] },
+                  { name: 'GCash', icon: 'gcash', fields: [] },
                 ]).map((m) => {
                   const val = m.name.toLowerCase()
                   return (
@@ -570,17 +571,12 @@ function Pos() {
               </div>
             )}
 
-            {paymentMethod !== 'cash' && (() => {
-              const selected = (paymentMethodsList.length > 0 ? paymentMethodsList : []).find((m) => m.name.toLowerCase() === paymentMethod)
-              const fields = selected?.fields || []
-              if (!fields.length) return null
-              return (
-                <div className="text-xs text-gray-400 mb-3 flex items-center gap-1.5">
-                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" /></svg>
-                  <span>Payment details required — click Charge to fill.</span>
-                </div>
-              )
-            })()}
+            {paymentMethod === 'gcash' && (
+              <div className="mb-3 text-xs text-gray-400 flex items-center gap-1.5">
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M3.75 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 0 1 3.75 9.375v-4.5ZM3.75 14.625c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5a1.125 1.125 0 0 1-1.125-1.125v-4.5ZM13.5 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 0 1 13.5 9.375v-4.5Z" /></svg>
+                <span>Click Charge to show QR code for customer to scan.</span>
+              </div>
+            )}
 
             {amountPaid && parseFloat(amountPaid) >= total && (
               <div className="text-sm text-green-600 font-medium mb-3 flex justify-between">
@@ -614,6 +610,7 @@ function Pos() {
               className="flex-1 bg-red-500 text-white py-3 rounded-lg text-sm font-bold shadow-sm hover:bg-red-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >Void</button>
             <button onClick={() => {
+              if (paymentMethod === 'gcash') { setGcashQrOpen(true); return }
               const method = selectedPaymentMethod || paymentMethodsList.find((m) => m.name.toLowerCase() === paymentMethod)
               const hasFields = method?.fields?.length > 0
               if (paymentMethod !== 'cash' && hasFields) {
@@ -693,44 +690,115 @@ function Pos() {
         </div>
       </Modal>
 
-      <Modal isOpen={paymentDetailsOpen} onClose={() => setPaymentDetailsOpen(false)} title="Payment Details">
+      <Modal isOpen={paymentDetailsOpen} onClose={() => setPaymentDetailsOpen(false)} title="Payment Details" size="lg">
         {(() => {
           const method = selectedPaymentMethod || paymentMethodsList.find((m) => m.name.toLowerCase() === paymentMethod)
           const fields = method?.fields || []
+          const scanRef = paymentDetails.scannedRef || ''
+          const scanRefKey = fields.find((f) => /ref/i.test(f.key))?.key || 'scannedRef'
           return (
-            <div className="space-y-3">
-              <p className="text-sm text-gray-500">Enter the required details for <strong className="capitalize">{paymentMethod}</strong>.</p>
-              {fields.map((f, i) => {
-                const val = paymentDetails[f.key] || ''
-                const setVal = (v) => setPaymentDetails((p) => ({ ...p, [f.key]: v }))
-                if (f.type === 'select') {
-                  return (
-                    <div key={i}>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">{f.label}{f.required ? ' *' : ''}</label>
-                      <select value={val} onChange={(e) => setVal(e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none">
-                        <option value="">{f.placeholder || `Select ${f.label}`}</option>
-                        {(f.options || []).map((o) => <option key={o} value={o}>{o}</option>)}
-                      </select>
-                    </div>
-                  )
-                }
-                return (
-                  <div key={i}>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">{f.label}{f.required ? ' *' : ''}</label>
-                    <input type={f.type === 'number' ? 'number' : 'text'}
-                      inputMode={f.type === 'number' ? 'decimal' : undefined}
-                      maxLength={f.maxLength || undefined}
-                      value={val}
-                      onChange={(e) => setVal(f.type === 'number' ? e.target.value.replace(/[^0-9.]/g, '') : f.maxLength ? e.target.value.slice(0, f.maxLength) : e.target.value)}
-                      placeholder={f.placeholder || ''}
-                      className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none" />
+            <div className="space-y-4">
+              <p className="text-sm text-gray-500">Ask customer to scan the QR code or enter the reference number for <strong className="capitalize">{paymentMethod}</strong>.</p>
+
+              {method?.qrCode && (
+                <div className="flex flex-col items-center py-4">
+                  <div className="bg-white rounded-2xl border-2 border-dashed border-indigo-200 p-6 shadow-sm">
+                    <img src={`https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(method.qrCode)}`}
+                      alt="Payment QR Code" className="w-56 h-56" />
                   </div>
-                )
-              })}
+                  <p className="text-[10px] text-gray-400 mt-2">Customer: scan this QR with your {paymentMethod === 'gcash' ? 'GCash' : paymentMethod === 'maya' ? 'Maya' : 'payment'} app</p>
+                </div>
+              )}
+
+              <div className="border-2 border-dashed border-indigo-200 rounded-xl p-4 bg-indigo-50/50">
+                <label className="block text-xs font-medium text-indigo-700 mb-1.5 uppercase tracking-wider">Reference Number</label>
+                <div className="flex gap-2">
+                  <input ref={scanInputRef} type="text" value={scanRef}
+                    onChange={(e) => setPaymentDetails((p) => ({ ...p, [scanRefKey]: e.target.value }))}
+                    onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); document.getElementById('payment-continue-btn')?.click() } }}
+                    placeholder="Enter or scan reference number..." autoFocus
+                    className="flex-1 rounded-lg border border-indigo-200 px-3 py-2.5 text-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 focus:outline-none" />
+                  <button type="button" onClick={() => { const r = Date.now().toString(36).toUpperCase(); setPaymentDetails((p) => ({ ...p, [scanRefKey]: r })) }}
+                    className="shrink-0 px-3 py-2.5 text-xs font-medium text-indigo-700 bg-indigo-100 rounded-lg hover:bg-indigo-200 transition-colors flex items-center gap-1.5">
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M3.75 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 0 1 3.75 9.375v-4.5ZM3.75 14.625c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5a1.125 1.125 0 0 1-1.125-1.125v-4.5ZM13.5 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 0 1 13.5 9.375v-4.5Z" /></svg>
+                    Gen
+                  </button>
+                </div>
+                <p className="text-[10px] text-indigo-400 mt-1.5">After customer pays, enter the reference number shown in their app.</p>
+              </div>
+
+              {fields.length > 0 && (
+                <div className="border-t border-gray-100 pt-3 space-y-3">
+                  <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Additional Fields</p>
+                  {fields.map((f, i) => {
+                    if (f.key === scanRefKey) return null
+                    const val = paymentDetails[f.key] || ''
+                    const setVal = (v) => setPaymentDetails((p) => ({ ...p, [f.key]: v }))
+                    if (f.type === 'select') {
+                      return (
+                        <div key={i}>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">{f.label}{f.required ? ' *' : ''}</label>
+                          <select value={val} onChange={(e) => setVal(e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none">
+                            <option value="">{f.placeholder || `Select ${f.label}`}</option>
+                            {(f.options || []).map((o) => <option key={o} value={o}>{o}</option>)}
+                          </select>
+                        </div>
+                      )
+                    }
+                    return (
+                      <div key={i}>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">{f.label}{f.required ? ' *' : ''}</label>
+                        <input type={f.type === 'number' ? 'number' : 'text'}
+                          inputMode={f.type === 'number' ? 'decimal' : undefined}
+                          maxLength={f.maxLength || undefined}
+                          value={val}
+                          onChange={(e) => setVal(f.type === 'number' ? e.target.value.replace(/[^0-9.]/g, '') : f.maxLength ? e.target.value.slice(0, f.maxLength) : e.target.value)}
+                          placeholder={f.placeholder || ''}
+                          className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none" />
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+
               <div className="flex justify-end gap-3 pt-2">
                 <button onClick={() => setPaymentDetailsOpen(false)} className="px-4 py-2 text-sm font-medium rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200">Cancel</button>
-                <button onClick={() => { setPaymentDetailsOpen(false); setChargeConfirmOpen(true) }} className="px-4 py-2 text-sm font-medium rounded-lg bg-indigo-600 text-white hover:bg-indigo-500">Continue</button>
+                <button id="payment-continue-btn" onClick={() => { setPaymentDetailsOpen(false); setChargeConfirmOpen(true) }} className="px-4 py-2 text-sm font-medium rounded-lg bg-indigo-600 text-white hover:bg-indigo-500">Continue</button>
               </div>
+            </div>
+          )
+        })()}
+      </Modal>
+
+      <Modal isOpen={gcashQrOpen} onClose={() => setGcashQrOpen(false)} title="Scan to Pay with GCash">
+        {(() => {
+          const gcashData = paymentMethodsList.length > 0
+            ? paymentMethodsList.find((m) => m.name.toLowerCase() === 'gcash')
+            : { name: 'GCash', icon: 'gcash', fields: [], qrCode: null }
+          return (
+            <div className="space-y-4 text-center">
+              <p className="text-sm text-gray-500">Ask the customer to scan this QR code with their GCash app.</p>
+              {gcashData?.qrCode ? (
+                <>
+                  <div className="flex justify-center py-4">
+                    <div className="bg-white rounded-2xl border-2 border-dashed border-indigo-200 p-6 shadow-sm inline-block">
+                      <img src={`https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(gcashData.qrCode)}`}
+                        alt="GCash QR" className="w-72 h-72" />
+                    </div>
+                  </div>
+                  <p className="text-xs text-gray-400">Once customer has paid, click Complete to finalize the sale.</p>
+                  <div className="flex justify-center gap-3 pt-2">
+                    <button onClick={() => setGcashQrOpen(false)} className="px-6 py-2.5 text-sm font-medium rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200">Cancel</button>
+                    <button onClick={() => { setGcashQrOpen(false); setChargeConfirmOpen(true) }} className="px-6 py-2.5 text-sm font-medium rounded-lg bg-green-600 text-white hover:bg-green-500">Complete Payment</button>
+                  </div>
+                </>
+              ) : (
+                <div className="py-8 text-sm text-gray-400">
+                  <p>No QR code configured for GCash.</p>
+                  <p className="text-xs mt-1">Go to Dashboard → Payment Methods → edit GCash → set QR Code Data.</p>
+                  <button onClick={() => setGcashQrOpen(false)} className="mt-4 px-6 py-2 text-sm font-medium rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200">Close</button>
+                </div>
+              )}
             </div>
           )
         })()}

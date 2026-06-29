@@ -47,7 +47,7 @@ function emptyField() {
 }
 
 function emptyForm() {
-  return { name: '', description: '', isActive: true, icon: 'other', fields: [], provider: '', apiKey: '', publicKey: '', mode: 'sandbox' }
+  return { name: '', description: '', isActive: true, icon: 'other', fields: [], provider: '', apiKey: '', publicKey: '', mode: 'sandbox', qrCode: '' }
 }
 
 function FormInput({ label, type = 'text', value, onChange, placeholder, required, className = '', children }) {
@@ -114,6 +114,7 @@ function PaymentMethods() {
       apiKey: item.apiKey && item.apiKey.startsWith('sk_••••') ? '' : (item.apiKey || ''),
       publicKey: item.publicKey || '',
       mode: item.mode || 'sandbox',
+      qrCode: item.qrCode || '',
     })
     setShowKeys(false)
   }
@@ -146,7 +147,7 @@ function PaymentMethods() {
       const payload = {
         name: form.name.trim(), description: form.description.trim(), isActive: form.isActive,
         icon: form.icon, fields: cleaned, provider: form.provider || undefined,
-        apiKey: form.apiKey || undefined, publicKey: form.publicKey || undefined, mode: form.mode || 'sandbox',
+        apiKey: form.apiKey || undefined, publicKey: form.publicKey || undefined, mode: form.mode || 'sandbox', qrCode: form.qrCode || undefined,
       }
       if (editingId) {
         await paymentMethodsApi.update(editingId, payload)
@@ -235,6 +236,11 @@ function PaymentMethods() {
               </div>
             )}
             {!form.provider && <p className="text-xs text-gray-400 mt-2 italic">No gateway — POS records reference numbers only.</p>}
+            <div className="mt-3">
+              <label className="block text-xs font-medium text-gray-500 mb-1 uppercase tracking-wider">QR Code Data (optional)</label>
+              <textarea value={form.qrCode} onChange={(e) => set('qrCode', e.target.value)} placeholder="e.g. gcash://pay/09171234567 or https://maya.link/pay/merchant123" rows={2} className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 focus:outline-none placeholder:text-gray-300 resize-none" />
+              <p className="text-[10px] text-gray-400 mt-1">Enter a payment link or merchant ID. A QR code will be generated on the POS screen for customers to scan.</p>
+            </div>
           </Section>
 
           <Section title="POS Input Fields" badge={`${form.fields.length} field${form.fields.length !== 1 ? 's' : ''}`}>

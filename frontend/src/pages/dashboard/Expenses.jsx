@@ -8,7 +8,7 @@ import { useToast } from '../../context/ToastContext.jsx'
 import { usePermission } from '../../hooks/usePermission.js'
 
 const expenseCategories = ['Utilities', 'Rent', 'Supplies', 'Maintenance', 'Salaries', 'Marketing', 'Transportation', 'Food', 'Other']
-const fallbackPaymentMethods = ['Cash', 'GCash', 'Bank Transfer', 'Credit Card', 'Other']
+const fallbackPaymentMethods = ['Cash', 'GCash']
 
 function Expenses() {
   const { addToast } = useToast()
@@ -34,7 +34,7 @@ function Expenses() {
 
   useEffect(() => {
     paymentMethodsApi.getAll().then((res) => {
-      const methods = Array.isArray(res) ? res.filter((m) => m.isActive !== false).map((m) => m.name) : []
+      const methods = Array.isArray(res) ? res.filter((m) => m.isActive !== false && ['cash', 'gcash'].includes(m.name.toLowerCase())).map((m) => m.name) : []
       if (methods.length) {
         setPaymentMethods(methods)
         setForm((prev) => ({ ...prev, paymentMethod: methods[0] }))

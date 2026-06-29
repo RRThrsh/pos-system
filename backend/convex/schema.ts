@@ -132,6 +132,7 @@ export default defineSchema({
     apiKey: v.optional(v.string()),
     publicKey: v.optional(v.string()),
     mode: v.optional(v.string()),
+    qrCode: v.optional(v.string()),
     createdAt: v.string(),
     updatedAt: v.string(),
   }).index("by_name", ["name"]),
