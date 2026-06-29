@@ -153,3 +153,75 @@ exports.confirmPayment = async (req, res) => {
     res.status(500).json({ message: error.message || "Failed to confirm payment." })
   }
 }
+
+exports.checkPaymentStatus = async (req, res) => {
+  const { paymentIntentId, saleId, methodId } = req.body
+  if (!paymentIntentId || !saleId) return res.status(400).json({ message: "paymentIntentId and saleId are required." })
+
+  try {
+    const method = methodId
+      ? await client.query(ref("paymentMethods:list")).then((methods) => methods.find((m) => m._id === methodId))
+      : null
+    const apiKey = method?.apiKey || process.env.STRIPE_SECRET_KEY
+    if (!apiKey) return res.status(400).json({ message: "No API key available to check payment status." })
+
+    let status
+    if (method?.provider === "paymongo") {
+      const response = await fetch(`https://api.paymongo.com/v1/payment_intents/${paymentIntentId}`, {
+        headers: { Authorization: `Basic ${Buffer.from(apiKey + ":").toString("base64")}` },
+      })
+      const data = await response.json()
+      if (!response.ok) throw new Error(data.errors?.[0]?.detail || "PayMongo error")
+      status = data.data.attributes.status
+    } else {
+      const Stripe = require("stripe")
+      const stripe = Stripe(apiKey)
+      const intent = await stripe.paymentIntents.retrieve(paymentIntentId)
+      status = intent.status
+    }
+
+    await client.mutation(ref("sales:updatePaymentStatus"), { id: saleId, paymentStatus: status })
+    res.json({ paymentIntentId, status })
+  } catch (error) {
+    console.error("Check payment status error:", error)
+    res.status(500).json({ message: error.message || "Failed to check payment status." })
+  }
+}
+
+exports.refundPayment = async (req, res) => {
+  const { paymentIntentId, methodId, amount } = req.body
+  if (!paymentIntentId) return res.status(400).json({ message: "paymentIntentId is required." })
+
+  try {
+    const method = methodId
+      ? await client.query(ref("paymentMethods:list")).then((methods) => methods.find((m) => m._id === methodId))
+      : null
+    const apiKey = method?.apiKey || process.env.STRIPE_SECRET_KEY
+    if (!apiKey) return res.status(400).json({ message: "No API key available to process refund." })
+
+    if (method?.provider === "paymongo") {
+      const response = await fetch(`https://api.paymongo.com/v1/payment_intents/${paymentIntentId}/refund`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Basic ${Buffer.from(apiKey + ":").toString("base64")}`,
+        },
+        body: amount ? JSON.stringify({ data: { attributes: { amount: Math.round(amount * 100) } } }) : undefined,
+      })
+      const data = await response.json()
+      if (!response.ok) throw new Error(data.errors?.[0]?.detail || "PayMongo refund error")
+      return res.json({ id: data.data.id, status: data.data.attributes.status })
+    }
+
+    const Stripe = require("stripe")
+    const stripe = Stripe(apiKey)
+    const refund = await stripe.refunds.create({
+      payment_intent: paymentIntentId,
+      amount: amount ? Math.round(amount * 100) : undefined,
+    })
+    res.json({ id: refund.id, status: refund.status, paymentIntent: refund.payment_intent })
+  } catch (error) {
+    console.error("Refund error:", error)
+    res.status(500).json({ message: error.message || "Refund failed." })
+  }
+}

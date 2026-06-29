@@ -238,6 +238,9 @@ function Pos() {
         setProcessingPayment(false)
         if (pmResult.status !== 'succeeded' && pmResult.status !== 'requires_capture' && pmResult.status !== 'requires_confirmation') {
           const paymentId = pmResult.id || 'unknown'
+          if (pmResult.status === 'failed' || pmResult.status === 'requires_payment_method' || pmResult.status === 'canceled') {
+            throw new Error(`Payment ${pmResult.status}. Please try again.`)
+          }
           addToast(`Payment initiated (${paymentId}). Waiting for customer to complete...`, 'info')
         }
       }

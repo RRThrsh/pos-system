@@ -218,3 +218,11 @@ export const nextReceiptNumber = mutation({
     return { number: `${ptuPrefix}${String(next).padStart(8, "0")}`, sequence: next }
   },
 })
+
+export const updatePaymentStatus = mutation({
+  args: { id: v.id("sales"), paymentStatus: v.string() },
+  handler: async (ctx, { id, paymentStatus }) => {
+    await ctx.db.patch(id, { paymentStatus, updatedAt: new Date().toISOString() })
+    return await ctx.db.get(id)
+  },
+})

@@ -1,18 +1,22 @@
 import { useState, useEffect } from 'react'
-import { salesApi } from '../../services/api.js'
+import { salesApi, paymentsApi } from '../../services/api.js'
 import Modal from '../../components/Modal.jsx'
 import Spinner from '../../components/Spinner.jsx'
 import Pagination, { PAGE_SIZE } from '../../components/Pagination.jsx'
+import { ConfirmDialog } from '../../components/index.js'
 import { useToast } from '../../context/ToastContext.jsx'
 
 function PaymentReceipts() {
   const { addToast } = useToast()
   const [items, setItems] = useState([])
   const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(null)
   const [page, setPage] = useState(1)
   const [viewItem, setViewItem] = useState(null)
   const [paymentFilter, setPaymentFilter] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
+  const [refundTarget, setRefundTarget] = useState(null)
+  const [refundConfirmOpen, setRefundConfirmOpen] = useState(false)
 
   const load = () => {
     setLoading(true)
@@ -50,6 +54,35 @@ function PaymentReceipts() {
     if (status === 'voided') return <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-red-100 text-red-700">Voided</span>
     if (status === 'partially-returned') return <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-yellow-100 text-yellow-700">Partially Returned</span>
     return <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-green-100 text-green-700">Completed</span>
+  }
+
+  const handleRefreshStatus = async (sale) => {
+    const id = sale._id || sale.id
+    if (!sale.paymentIntentId) return addToast('No payment intent ID to check.', 'error')
+    setRefreshing(id)
+    try {
+      const res = await paymentsApi.checkStatus({ paymentIntentId: sale.paymentIntentId, saleId: id })
+      addToast(`Payment status: ${res.status}`, 'success')
+      load()
+    } catch (err) {
+      addToast(err.message || 'Failed to refresh status', 'error')
+    } finally {
+      setRefreshing(null)
+    }
+  }
+
+  const handleRefund = async () => {
+    if (!refundTarget) return
+    try {
+      await paymentsApi.refund({ paymentIntentId: refundTarget.paymentIntentId })
+      addToast('Refund processed successfully.', 'success')
+      load()
+    } catch (err) {
+      addToast(err.message || 'Refund failed', 'error')
+    } finally {
+      setRefundTarget(null)
+      setRefundConfirmOpen(false)
+    }
   }
 
   let filtered = items
@@ -100,7 +133,19 @@ function PaymentReceipts() {
                   <td className="px-4 py-3 text-center">{saleStatusBadge(sale.status)}</td>
                   <td className="px-4 py-3 text-right font-medium">&#8369;{Number(sale.total || 0).toLocaleString()}</td>
                   <td className="px-4 py-3 text-center">
-                    <button onClick={() => setViewItem(sale)} className="text-indigo-600 hover:text-indigo-800 text-xs font-medium">View</button>
+                    <div className="flex items-center justify-center gap-1">
+                      <button onClick={() => setViewItem(sale)} className="text-indigo-600 hover:text-indigo-800 text-xs font-medium">View</button>
+                      {sale.paymentIntentId && (
+                        <>
+                          <button onClick={() => handleRefreshStatus(sale)} disabled={refreshing === (sale._id || sale.id)} className="text-gray-500 hover:text-gray-700 text-xs disabled:opacity-50 ml-1">
+                            {refreshing === (sale._id || sale.id) ? '...' : 'Refresh'}
+                          </button>
+                          {sale.paymentStatus === 'succeeded' && sale.status !== 'voided' && (
+                            <button onClick={() => { setRefundTarget(sale); setRefundConfirmOpen(true) }} className="text-red-500 hover:text-red-700 text-xs ml-1">Refund</button>
+                          )}
+                        </>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -154,7 +199,7 @@ function PaymentReceipts() {
             {viewItem.paymentIntentId && (
               <div className="bg-gray-50 rounded-lg p-3">
                 <span className="text-xs text-gray-400">Payment Intent ID</span>
-                <p className="font-mono text-xs text-gray-700 mt-0.5">{viewItem.paymentIntentId}</p>
+                <p className="font-mono text-xs text-gray-700 mt-0.5 break-all">{viewItem.paymentIntentId}</p>
               </div>
             )}
 
@@ -181,6 +226,16 @@ function PaymentReceipts() {
           </div>
         )}
       </Modal>
+
+      <ConfirmDialog
+        isOpen={refundConfirmOpen}
+        onClose={() => { setRefundConfirmOpen(false); setRefundTarget(null) }}
+        onConfirm={handleRefund}
+        title="Refund Payment"
+        message={`Are you sure you want to refund this payment of ₱${Number(refundTarget?.total || 0).toLocaleString()}? The amount will be returned to the customer.`}
+        confirmText="Process Refund"
+        confirmVariant="danger"
+      />
     </div>
   )
 }
