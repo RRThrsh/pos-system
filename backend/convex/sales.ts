@@ -57,8 +57,10 @@ export const create = mutation({
     customerPhone: v.optional(v.string()),
     buyerTin: v.optional(v.string()),
     notes: v.optional(v.string()),
+    paymentIntentId: v.optional(v.string()),
+    paymentStatus: v.optional(v.string()),
   },
-  handler: async (ctx, { items, transactionId, receiptNumber, paymentMethod, amountPaid, discount, discountType, orderType, promoCode, tax, taxRate, createdBy, customerId, customerName, customerPhone, buyerTin, notes }) => {
+  handler: async (ctx, { items, transactionId, receiptNumber, paymentMethod, amountPaid, discount, discountType, orderType, promoCode, tax, taxRate, createdBy, customerId, customerName, customerPhone, buyerTin, notes, paymentIntentId, paymentStatus }) => {
     const saleItems = []
     let subtotal = 0
 
@@ -122,6 +124,8 @@ export const create = mutation({
       createdBy,
       createdAt: new Date().toISOString(),
       voidedAt: undefined,
+      paymentIntentId,
+      paymentStatus,
     })
   },
 })

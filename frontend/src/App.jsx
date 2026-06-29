@@ -27,6 +27,7 @@ import PromoCodes from './pages/dashboard/PromoCodes.jsx'
 import Customers from './pages/dashboard/Customers.jsx'
 import StockCounts from './pages/dashboard/StockCounts.jsx'
 import PaymentMethods from './pages/dashboard/PaymentMethods.jsx'
+import PaymentReceipts from './pages/dashboard/PaymentReceipts.jsx'
 import RegisterAccount from './pages/dashboard/RegisterAccount.jsx'
 
 function App() {
@@ -67,6 +68,7 @@ function App() {
               <Route path="/dashboard/stock-counts" element={<StockCounts />} />
               <Route path="/dashboard/tables" element={<Tables />} />
               <Route path="/dashboard/payment-methods" element={<PaymentMethods />} />
+              <Route path="/dashboard/payment-receipts" element={<PaymentReceipts />} />
               <Route path="/dashboard/register" element={<RegisterAccount />} />
             </Route>
             <Route path="*" element={<Navigate to="/login" replace />} />
