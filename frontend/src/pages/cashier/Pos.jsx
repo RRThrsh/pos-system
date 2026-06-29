@@ -60,6 +60,7 @@ function Pos() {
   const [confirmFocusIndex, setConfirmFocusIndex] = useState(0)
   const voidModalRef = useRef(null)
   const [chargeConfirmOpen, setChargeConfirmOpen] = useState(false)
+  const [paymentDetailsOpen, setPaymentDetailsOpen] = useState(false)
   const [chargeFocusIndex, setChargeFocusIndex] = useState(0)
   const chargeModalRef = useRef(null)
 
@@ -573,34 +574,9 @@ function Pos() {
               const fields = selected?.fields || []
               if (!fields.length) return null
               return (
-                <div className="mb-3 space-y-2">
-                  {fields.map((f, i) => {
-                    const val = paymentDetails[f.key] || ''
-                    const setVal = (v) => setPaymentDetails((p) => ({ ...p, [f.key]: v }))
-                    if (f.type === 'select') {
-                      return (
-                        <div key={i}>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">{f.label}{f.required ? ' *' : ''}</label>
-                          <select value={val} onChange={(e) => setVal(e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none">
-                            <option value="">{f.placeholder || `Select ${f.label}`}</option>
-                            {(f.options || []).map((o) => <option key={o} value={o}>{o}</option>)}
-                          </select>
-                        </div>
-                      )
-                    }
-                    return (
-                      <div key={i}>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">{f.label}{f.required ? ' *' : ''}</label>
-                        <input type={f.type === 'number' ? 'number' : 'text'}
-                          inputMode={f.type === 'number' ? 'decimal' : undefined}
-                          maxLength={f.maxLength || undefined}
-                          value={val}
-                          onChange={(e) => setVal(f.type === 'number' ? e.target.value.replace(/[^0-9.]/g, '') : f.maxLength ? e.target.value.slice(0, f.maxLength) : e.target.value)}
-                          placeholder={f.placeholder || ''}
-                          className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none" />
-                      </div>
-                    )
-                  })}
+                <div className="text-xs text-gray-400 mb-3 flex items-center gap-1.5">
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" /></svg>
+                  <span>Payment details required — click Charge to fill.</span>
                 </div>
               )
             })()}
@@ -636,7 +612,15 @@ function Pos() {
               disabled={!cart.length}
               className="flex-1 bg-red-500 text-white py-3 rounded-lg text-sm font-bold shadow-sm hover:bg-red-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >Void</button>
-            <button onClick={() => setChargeConfirmOpen(true)}
+            <button onClick={() => {
+              const method = selectedPaymentMethod || paymentMethodsList.find((m) => m.name.toLowerCase() === paymentMethod)
+              const hasFields = method?.fields?.length > 0
+              if (paymentMethod !== 'cash' && hasFields) {
+                setPaymentDetailsOpen(true)
+              } else {
+                setChargeConfirmOpen(true)
+              }
+            }}
               disabled={!cart.length || submitting || (paymentMethod === 'cash' && (!amountPaid || parseFloat(amountPaid) < total)) || processingPayment}
               className="flex-1 bg-green-600 text-white py-3 rounded-lg text-sm font-bold shadow-sm hover:bg-green-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >{submitting ? 'Processing...' : `Charge  \u20B1${total.toLocaleString()} (${shortcuts.charge?.key || 'F2'})`}</button>
@@ -706,6 +690,49 @@ function Pos() {
             </div>
           )}
         </div>
+      </Modal>
+
+      <Modal isOpen={paymentDetailsOpen} onClose={() => setPaymentDetailsOpen(false)} title="Payment Details">
+        {(() => {
+          const method = selectedPaymentMethod || paymentMethodsList.find((m) => m.name.toLowerCase() === paymentMethod)
+          const fields = method?.fields || []
+          return (
+            <div className="space-y-3">
+              <p className="text-sm text-gray-500">Enter the required details for <strong className="capitalize">{paymentMethod}</strong>.</p>
+              {fields.map((f, i) => {
+                const val = paymentDetails[f.key] || ''
+                const setVal = (v) => setPaymentDetails((p) => ({ ...p, [f.key]: v }))
+                if (f.type === 'select') {
+                  return (
+                    <div key={i}>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">{f.label}{f.required ? ' *' : ''}</label>
+                      <select value={val} onChange={(e) => setVal(e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none">
+                        <option value="">{f.placeholder || `Select ${f.label}`}</option>
+                        {(f.options || []).map((o) => <option key={o} value={o}>{o}</option>)}
+                      </select>
+                    </div>
+                  )
+                }
+                return (
+                  <div key={i}>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">{f.label}{f.required ? ' *' : ''}</label>
+                    <input type={f.type === 'number' ? 'number' : 'text'}
+                      inputMode={f.type === 'number' ? 'decimal' : undefined}
+                      maxLength={f.maxLength || undefined}
+                      value={val}
+                      onChange={(e) => setVal(f.type === 'number' ? e.target.value.replace(/[^0-9.]/g, '') : f.maxLength ? e.target.value.slice(0, f.maxLength) : e.target.value)}
+                      placeholder={f.placeholder || ''}
+                      className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none" />
+                  </div>
+                )
+              })}
+              <div className="flex justify-end gap-3 pt-2">
+                <button onClick={() => setPaymentDetailsOpen(false)} className="px-4 py-2 text-sm font-medium rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200">Cancel</button>
+                <button onClick={() => { setPaymentDetailsOpen(false); setChargeConfirmOpen(true) }} className="px-4 py-2 text-sm font-medium rounded-lg bg-indigo-600 text-white hover:bg-indigo-500">Continue</button>
+              </div>
+            </div>
+          )
+        })()}
       </Modal>
 
       <Modal isOpen={chargeConfirmOpen} onClose={() => setChargeConfirmOpen(false)} title="Confirm Charge">

@@ -50,7 +50,7 @@ exports.create = async (req, res) => {
     })
     const sale = await client.query(ref("sales:getById"), { id })
     if (promoCode) {
-      client.mutation(ref("promoCodes:incrementUseCount"), { code: promoCode }).catch(() => {})
+      client.mutation(ref("promoCodes:incrementUseCount"), { code: promoCode }).catch((err) => console.warn("Promo code increment skipped:", err.message))
     }
     await audit.log("create_sale", req, { details: `Sale #${receiptNumber || sale.transactionId || id} - ₱${sale.total} (${items.length} items)`, itemId: id })
     res.status(201).json(sale)
